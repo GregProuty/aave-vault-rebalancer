@@ -9,10 +9,10 @@ import { ApolloProvider } from '@apollo/client';
 import { apolloClient } from '../lib/apollo-client';
 import '@rainbow-me/rainbowkit/styles.css';
 
-// Wagmi configuration - using a minimal config to avoid WalletConnect auth errors
+// Wagmi configuration - minimal config without WalletConnect analytics
 const config = getDefaultConfig({
   appName: 'AAVE Vault Rebalancer',
-  projectId: '2f05ae7f2dc0d19002fb4db99c73e1db', // Using a valid demo project ID to avoid auth errors
+  projectId: '', // Empty to disable WalletConnect analytics
   chains: [mainnet, sepolia, baseSepolia, localhost],
   transports: {
     [mainnet.id]: http(),
