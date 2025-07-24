@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface ChartProps {
   width?: number;
@@ -15,6 +15,12 @@ const Chart = ({
   dotSize = 1.5, 
   dotSpacing = 12 
 }: ChartProps) => {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const generateDots = () => {
     const dots = [];
     const cols = Math.floor(width / dotSpacing);
@@ -47,8 +53,9 @@ const Chart = ({
             opacity = 0.3;
           }
         } else {
-          // Sparse dots above the curve
-          if (Math.random() < 0.05) {
+          // Deterministic sparse dots above the curve (replace Math.random)
+          const hash = (row * 31 + col * 17) % 100;
+          if (hash < 5) {
             opacity = 0.1;
           }
         }
@@ -70,6 +77,15 @@ const Chart = ({
     
     return dots;
   };
+
+  // Only render on client to avoid hydration mismatch
+  if (!isClient) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-gray-400 text-sm">Loading chart...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full">

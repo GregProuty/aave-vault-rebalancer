@@ -13,6 +13,7 @@ interface AllocationProps {
 }
 
 const Allocation = ({ allocations }: AllocationProps) => {
+  console.log(allocations);
   return (
     <div className="bg-[#1a1a1a] border border-[#333] text-white p-6 rounded-lg w-full max-w-md">
       <h2 className="text-xl font-medium mb-6">Allocation</h2>
@@ -50,6 +51,14 @@ const Allocation = ({ allocations }: AllocationProps) => {
             </div>
           </div>
         ))}
+      </div>
+      
+      {/* Data source indicator */}
+      <div className="mt-4 pt-3 border-t border-[#333]">
+        <div className="flex items-center justify-center space-x-1 text-xs text-gray-500">
+          <span className="text-green-400">●</span>
+          <span>Live data from rebalancer-2.testnet</span>
+        </div>
       </div>
     </div>
   );

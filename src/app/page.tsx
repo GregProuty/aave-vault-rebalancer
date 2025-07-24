@@ -1,29 +1,32 @@
 'use client';
 
-import { useState } from 'react';
 // import Image from "next/image";
-import Activity from "@/components/Activity";
+import ActivityGraphQL from "@/components/ActivityGraphQL";
 import Allocation from "@/components/Allocation";
 import StatusPanel from "@/components/StatusPanel";
 import { EthereumWalletConnection } from "@/components/EthereumWalletConnection";
 import { VaultActions } from "@/components/VaultActions";
 import PortfolioValue from "@/components/PortfolioValue";
-import { ProtocolSwitcher } from "@/components/ProtocolSwitcher";
 import { useAllocationData } from "@/hooks/useAllocationData";
+import { usePerformanceData } from "@/hooks/usePerformanceData";
+import GraphQLTest from "@/components/GraphQLTest";
 
 export default function Home() {
-  const [protocol, setProtocol] = useState<'near' | 'ethereum'>('ethereum');
-  const { allocations, totalValue, isLoading, error } = useAllocationData(protocol);
+  const { allocations, isLoading: allocationsLoading, error: allocationsError } = useAllocationData();
+  const { 
+    totalValue, 
+    totalGains, 
+    currentApy, 
+    loading: performanceLoading, 
+    error: performanceError
+  } = usePerformanceData();
+  
+  const isLoading = allocationsLoading || performanceLoading;
+  const hasError = allocationsError || performanceError;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Protocol Switcher */}
-        <ProtocolSwitcher 
-          currentProtocol={protocol}
-          onProtocolChange={setProtocol}
-        />
-
         {/* Top row */}
         <div className="grid grid-cols-12 gap-4 mb-4">
           {/* Left - Status Panel */}
@@ -31,31 +34,28 @@ export default function Home() {
             <StatusPanel 
               nextRebalanceTime="6h 25m"
               messages={[
-                { text: `Connect your ${protocol === 'ethereum' ? 'Ethereum' : 'NEAR'} wallet to get started!`, type: "info" }
+                { text: hasError ? "GraphQL backend disconnected - check console" : "GraphQL backend connected", type: hasError ? "error" : "success" },
+                { text: "Real-time performance tracking active", type: "success" },
+                { text: `Tracking ${performanceLoading ? "..." : "30"} days of data`, type: "info" },
+                { text: "Connect Ethereum wallet to deposit", type: "warning" }
               ]}
             />
+            <div className="mt-2">
+              <GraphQLTest />
+            </div>
           </div>
           
           {/* Right - Portfolio Value (spans remaining columns) */}
           <div className="col-span-9">
-            <PortfolioValue totalValue={totalValue} gains={247000} apy={4.47} />
+            <PortfolioValue totalValue={totalValue} gains={totalGains} apy={currentApy} />
           </div>
         </div>
         
-        {/* Bottom row */}
+        {/* Main row */}
         <div className="grid grid-cols-12 gap-4">
           {/* Left - Wallet Connection */}
           <div className="col-span-3">
-            {protocol === 'ethereum' ? (
-              <EthereumWalletConnection />
-            ) : (
-              <div className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
-                <h3 className="text-lg font-semibold text-white mb-4">NEAR Wallet</h3>
-                <p className="text-gray-400 text-center py-8">
-                  NEAR wallet integration coming soon...
-                </p>
-              </div>
-            )}
+            <EthereumWalletConnection />
           </div>
           
           {/* Center Left - Vault Actions */}
@@ -70,10 +70,10 @@ export default function Home() {
                 <h2 className="text-xl font-medium mb-6">Allocation</h2>
                 <div className="text-gray-400 text-center py-8">Loading allocation data...</div>
               </div>
-            ) : error ? (
+            ) : hasError ? (
               <div className="bg-[#1a1a1a] border border-[#333] text-white p-6 rounded-lg">
                 <h2 className="text-xl font-medium mb-6">Allocation</h2>
-                <div className="text-red-400 text-center py-8">Error: {error}</div>
+                <div className="text-red-400 text-center py-8">Error loading data</div>
               </div>
             ) : (
               <Allocation allocations={allocations} />
@@ -82,14 +82,7 @@ export default function Home() {
           
           {/* Right - Activity */}
           <div className="col-span-3">
-            <Activity events={[
-              `Connected to ${protocol === 'ethereum' ? 'Ethereum' : 'NEAR'} wallet`,
-              "Vault contract loaded",
-              "Ready for deposits and withdrawals",
-              "Monitoring vault performance...",
-              "AI agent ready for rebalancing",
-              "Checking yield opportunities..."
-            ]} />
+            <ActivityGraphQL />
           </div>
         </div>
       </div>

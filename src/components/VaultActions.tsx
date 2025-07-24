@@ -6,18 +6,31 @@ import { parseUnits, formatUnits } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, MOCK_USDC_ADDRESS } from '@/utils/contracts';
 
 export const VaultActions: React.FC = () => {
+  const { address, isConnected, chainId } = useAccount();
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isApproving, setIsApproving] = useState(false);
   const [isDepositing, setIsDepositing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  const { address, isConnected, chainId } = useAccount();
-  const { writeContract, data: hash, error, isPending } = useWriteContract();
+  // Check if current chain is supported
+  const isChainSupported = chainId === 31337 || chainId === 84532;
+  const contractAddress = isChainSupported && chainId ? (() => {
+    try {
+      return getContractAddress(chainId);
+    } catch {
+      return null;
+    }
+  })() : null;
 
   // Wait for transaction confirmation
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
+    query: {
+      enabled: !!hash,
+    },
   });
 
   // Read user's USDC balance
@@ -27,28 +40,28 @@ export const VaultActions: React.FC = () => {
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!chainId,
+      enabled: !!address && !!chainId && isChainSupported,
     },
   });
 
   // Read user's vault share balance
   const { data: shareBalance } = useReadContract({
-    address: chainId ? getContractAddress(chainId) as `0x${string}` : undefined,
+    address: contractAddress as `0x${string}` | undefined,
     abi: AAVE_VAULT_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!chainId,
+      enabled: !!address && !!contractAddress,
     },
   });
 
   // Read total assets in vault
   const { data: totalAssets } = useReadContract({
-    address: chainId ? getContractAddress(chainId) as `0x${string}` : undefined,
+    address: contractAddress as `0x${string}` | undefined,
     abi: AAVE_VAULT_ABI,
     functionName: 'totalAssets',
     query: {
-      enabled: !!chainId,
+      enabled: !!contractAddress,
     },
   });
 
@@ -57,18 +70,17 @@ export const VaultActions: React.FC = () => {
     address: MOCK_USDC_ADDRESS as `0x${string}`,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: address && chainId ? [address, getContractAddress(chainId) as `0x${string}`] : undefined,
+    args: address && contractAddress ? [address, contractAddress as `0x${string}`] : undefined,
     query: {
-      enabled: !!address && !!chainId,
+      enabled: !!address && !!contractAddress,
     },
   });
 
   const handleApprove = async () => {
-    if (!address || !chainId || !depositAmount) return;
+    if (!address || !contractAddress || !depositAmount) return;
 
     try {
       setIsApproving(true);
-      const contractAddress = getContractAddress(chainId);
       
       await writeContract({
         address: MOCK_USDC_ADDRESS as `0x${string}`,
@@ -84,11 +96,10 @@ export const VaultActions: React.FC = () => {
   };
 
   const handleDeposit = async () => {
-    if (!address || !chainId || !depositAmount) return;
+    if (!address || !contractAddress || !depositAmount) return;
 
     try {
       setIsDepositing(true);
-      const contractAddress = getContractAddress(chainId);
       
       await writeContract({
         address: contractAddress as `0x${string}`,
@@ -104,11 +115,10 @@ export const VaultActions: React.FC = () => {
   };
 
   const handleWithdraw = async () => {
-    if (!address || !chainId || !withdrawAmount) return;
+    if (!address || !contractAddress || !withdrawAmount) return;
 
     try {
       setIsWithdrawing(true);
-      const contractAddress = getContractAddress(chainId);
       
       await writeContract({
         address: contractAddress as `0x${string}`,
@@ -124,14 +134,12 @@ export const VaultActions: React.FC = () => {
   };
 
   const handleAddTokenToWallet = async () => {
-    if (!chainId) return;
+    if (!contractAddress) return;
 
     try {
-      const contractAddress = getContractAddress(chainId);
-      
       // Check if ethereum is available
       if (typeof window !== 'undefined') {
-        const ethereum = (window as any).ethereum;
+        const ethereum = (window as { ethereum?: { request: (params: { method: string; params: unknown }) => Promise<void> } }).ethereum;
         if (ethereum) {
           await ethereum.request({
             method: 'wallet_watchAsset',
@@ -159,6 +167,24 @@ export const VaultActions: React.FC = () => {
         <p className="text-gray-400 text-center py-8">
           Connect your wallet to deposit or withdraw from the vault
         </p>
+      </div>
+    );
+  }
+
+  if (!isChainSupported) {
+    return (
+      <div className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
+        <h3 className="text-lg font-semibold text-white mb-4">Vault Actions</h3>
+        <div className="text-center py-8">
+          <p className="text-yellow-400 mb-4">⚠️ Unsupported Network</p>
+          <p className="text-gray-400 text-sm mb-4">
+            Please switch to one of the supported networks:
+          </p>
+          <div className="space-y-2 text-sm">
+            <div className="text-blue-400">• Base Sepolia (Chain ID: 84532)</div>
+            <div className="text-green-400">• Localhost (Chain ID: 31337)</div>
+          </div>
+        </div>
       </div>
     );
   }

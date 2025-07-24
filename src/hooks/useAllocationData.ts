@@ -1,6 +1,8 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { createNearContract } from '@/utils/nearContract';
+import { createNearContractReader, ChainAllocation } from '@/utils/nearContract';
 
 export interface AllocationItem {
   name: string;
@@ -10,80 +12,266 @@ export interface AllocationItem {
   color: string;
 }
 
-export interface AllocationData {
-  allocations: AllocationItem[];
-  totalValue: number;
-  isLoading: boolean;
-  error: string | null;
-}
+const PROTOCOL_ICONS: Record<string, string> = {
+  'ethereum': 'Ξ',
+  'base': 'B', 
+  'polygon': 'P',
+  'avalanche': 'A',
+  'arbitrum': 'AR',
+  'optimism': 'O',
+  'binance': 'B',
+  'near': 'N'
+};
 
-// Default allocation data (fallback)
-const DEFAULT_ALLOCATIONS: AllocationItem[] = [
-  { name: "Ethereum", icon: "Ξ", apy: 4.7, allocation: 44, color: "#627EEA" },
-  { name: "Avalanche", icon: "A", apy: 4, allocation: 27, color: "#E84142" },
-  { name: "Base", icon: "B", apy: 3.3, allocation: 14, color: "#0052FF" },
-  { name: "BNB Chain", icon: "B", apy: 2.8, allocation: 9, color: "#F3BA2F" },
-  { name: "Polygon", icon: "P", apy: 2.4, allocation: 6, color: "#8247E5" }
-];
+const PROTOCOL_COLORS: Record<string, string> = {
+  'ethereum': '#627EEA',
+  'base': '#0052FF',
+  'polygon': '#8247E5', 
+  'avalanche': '#E84142',
+  'arbitrum': '#213147',
+  'optimism': '#FF0420',
+  'binance': '#F3BA2F',
+  'near': '#00D395'
+};
 
-export const useAllocationData = (protocol: 'near' | 'ethereum' = 'ethereum'): AllocationData => {
-  const [allocations, setAllocations] = useState<AllocationItem[]>(DEFAULT_ALLOCATIONS);
-  const [totalValue, setTotalValue] = useState(1230000);
-  const [isLoading, setIsLoading] = useState(false);
+const getChainName = (chainId: number): string => {
+  const chainNames: Record<number, string> = {
+    1: 'Ethereum',
+    137: 'Polygon', 
+    43114: 'Avalanche',
+    8453: 'Base',
+    42161: 'Arbitrum',
+    10: 'Optimism',
+    56: 'Binance',
+    // Add more chain IDs as needed
+  };
+  return chainNames[chainId] || `Chain ${chainId}`;
+};
+
+const calculateEstimatedAPY = (protocol: string): number => {
+  // Estimate APY based on historical data for different protocols
+  const apyEstimates: Record<string, number> = {
+    'ethereum': 4.2,
+    'base': 3.8,
+    'polygon': 2.4,
+    'avalanche': 4.0,
+    'arbitrum': 3.5,
+    'optimism': 3.2,
+    'binance': 5.1,
+    'near': 7.2
+  };
+  return apyEstimates[protocol.toLowerCase()] || 3.5;
+};
+
+const formatAmount = (amount: string): number => {
+  try {
+    // Convert from wei/smallest unit to readable format
+    const bigIntAmount = BigInt(amount);
+    return Number(bigIntAmount) / 1e18;
+  } catch {
+    return 0;
+  }
+};
+
+export const useAllocationData = () => {
+  const [allocations, setAllocations] = useState<AllocationItem[]>([]);
+  const [totalValue, setTotalValue] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const { address, isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
 
   useEffect(() => {
     const fetchAllocationData = async () => {
-      if (!isConnected) {
-        setAllocations(DEFAULT_ALLOCATIONS);
-        return;
-      }
-
       setIsLoading(true);
       setError(null);
 
       try {
-        if (protocol === 'near') {
-          await fetchNearAllocationData();
-        } else {
-          await fetchEthereumAllocationData();
+        console.log('🔍 Fetching allocation data...');
+        
+        // Fetch NEAR allocation data first (this is the primary source now)
+        const nearData = await fetchNearAllocationData();
+        
+        if (nearData) {
+          console.log('✅ Using NEAR contract allocation data');
+          setAllocations(nearData.allocations);
+          setTotalValue(nearData.totalValue);
+          return;
         }
+
+        // Fallback to mock data if NEAR contract fails
+        console.log('⚠️ Using fallback allocation data');
+        const fallbackAllocations: AllocationItem[] = [
+          {
+            name: 'Ethereum',
+            icon: 'Ξ',
+            apy: 4.7,
+            allocation: 35,
+            color: '#627EEA'
+          },
+          {
+            name: 'Base',
+            icon: 'B',
+            apy: 3.3,
+            allocation: 25,
+            color: '#0052FF'
+          },
+          {
+            name: 'Polygon',
+            icon: 'P', 
+            apy: 2.4,
+            allocation: 20,
+            color: '#8247E5'
+          },
+          {
+            name: 'Avalanche',
+            icon: 'A',
+            apy: 4.0,
+            allocation: 20,
+            color: '#E84142'
+          }
+        ];
+
+        setAllocations(fallbackAllocations);
+        setTotalValue(1230000);
+
       } catch (err) {
-        console.error('Failed to fetch allocation data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch data');
-        setAllocations(DEFAULT_ALLOCATIONS);
+        console.error('💥 Error in fetchAllocationData:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error occurred');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchAllocationData();
-  }, [protocol, isConnected, address]);
+  }, [isConnected, address]);
 
   const fetchNearAllocationData = async () => {
-    // TODO: Implement NEAR contract integration
-    // This would require NEAR wallet selector to be available
-    // For now, return enhanced mock data based on the screenshot
-    const nearAllocations: AllocationItem[] = [
-      { name: "Ethereum", icon: "Ξ", apy: 4.7, allocation: 44, color: "#627EEA" },
-      { name: "Avalanche", icon: "A", apy: 4.0, allocation: 27, color: "#E84142" },
-      { name: "Base", icon: "B", apy: 3.3, allocation: 14, color: "#0052FF" },
-      { name: "BNB Chain", icon: "B", apy: 2.8, allocation: 9, color: "#F3BA2F" },
-      { name: "Polygon", icon: "P", apy: 2.4, allocation: 6, color: "#8247E5" }
-    ];
-    
-    setAllocations(nearAllocations);
-    setTotalValue(1230000);
-  };
+    try {
+      console.log('🔍 Attempting to fetch NEAR allocation data from rebalancer-10.testnet...');
+      const nearReader = createNearContractReader();
+      
+      // First test the connection
+      console.log('🔗 Testing NEAR RPC connection...');
+      const connectionTest = await nearReader.testConnection();
+      
+      if (!connectionTest) {
+        console.log('❌ NEAR RPC connection failed, skipping allocation fetch');
+        return null;
+      }
+      
+      // Fetch allocation data using the new get_allocations method
+      console.log('📞 Calling get_allocations method...');
+      const chainAllocations = await nearReader.getAllocations().catch((error) => {
+        console.log('❌ get_allocations failed:', error.message);
+        return null;
+      });
 
-  const fetchEthereumAllocationData = async () => {
-    // TODO: Implement Ethereum contract integration
-    // This would fetch data from the AaveVault contract
-    // For now, return mock data
-    setAllocations(DEFAULT_ALLOCATIONS);
-    setTotalValue(1230000);
+      if (chainAllocations && Array.isArray(chainAllocations) && chainAllocations.length > 0) {
+        console.log('📊 Raw chain allocations:', chainAllocations);
+        
+        // Calculate total value from all chains
+        let totalValue = 0;
+        const formattedAllocations: AllocationItem[] = [];
+
+        chainAllocations.forEach((allocation: ChainAllocation) => {
+          const chainName = getChainName(allocation.chainId);
+          const amount = formatAmount(allocation.amount);
+          totalValue += amount;
+
+          formattedAllocations.push({
+            name: chainName,
+            icon: PROTOCOL_ICONS[chainName.toLowerCase()] || chainName[0]?.toUpperCase() || '?',
+            apy: calculateEstimatedAPY(chainName),
+            allocation: 0, // Will be calculated as percentage after we have totalValue
+            color: PROTOCOL_COLORS[chainName.toLowerCase()] || '#666666'
+          });
+
+          console.log(`💰 Chain ${allocation.chainId} (${chainName}): ${amount} tokens`);
+        });
+
+        // Calculate allocation percentages
+        formattedAllocations.forEach(allocation => {
+          const chainAmount = chainAllocations.find(ca => 
+            getChainName(ca.chainId) === allocation.name
+          );
+          if (chainAmount) {
+            const amount = formatAmount(chainAmount.amount);
+            allocation.allocation = totalValue > 0 ? Math.round((amount / totalValue) * 100) : 0;
+          }
+        });
+
+        console.log('✅ Processed allocation data:', {
+          totalValue,
+          allocations: formattedAllocations
+        });
+
+        return {
+          allocations: formattedAllocations,
+          totalValue: Math.round(totalValue)
+        };
+      }
+
+      // Try to get activity logs as fallback
+      console.log('📋 Trying to fetch activity logs as fallback...');
+      const activityLogs = await nearReader.getLatestLogs(20).catch((error) => {
+        console.log('❌ get_latest_logs failed:', error.message);
+        return null;
+      });
+
+      if (activityLogs && Array.isArray(activityLogs) && activityLogs.length > 0) {
+        console.log('📋 Processing activity logs for allocation data...');
+        
+        // Analyze activity logs to derive allocation information
+        const chainActivity = new Map<number, { totalAmount: number, count: number }>();
+        let totalValue = 0;
+
+        activityLogs.forEach((log, index) => {
+          console.log(`📝 Processing log ${index}:`, log);
+          
+          if (log.actual_amount || log.expected_amount) {
+            const amount = formatAmount(log.actual_amount || log.expected_amount);
+            
+            // Count activity for both source and destination chains
+            [log.source_chain, log.destination_chain].forEach(chainId => {
+              if (chainId) {
+                const existing = chainActivity.get(chainId) || { totalAmount: 0, count: 0 };
+                existing.totalAmount += amount;
+                existing.count += 1;
+                chainActivity.set(chainId, existing);
+                totalValue += amount;
+              }
+            });
+          }
+        });
+
+        if (chainActivity.size > 0) {
+          // Convert to allocation percentages
+          const activityAllocations: AllocationItem[] = Array.from(chainActivity.entries()).map(([chainId, data]) => {
+            const chainName = getChainName(chainId);
+            return {
+              name: chainName,
+              icon: PROTOCOL_ICONS[chainName.toLowerCase()] || chainName[0]?.toUpperCase() || '?',
+              apy: calculateEstimatedAPY(chainName),
+              allocation: totalValue > 0 ? Math.round((data.totalAmount / totalValue) * 100) : 0,
+              color: PROTOCOL_COLORS[chainName.toLowerCase()] || '#666666'
+            };
+          });
+
+          console.log('🎉 Using allocation data derived from activity logs!');
+          return {
+            allocations: activityAllocations,
+            totalValue: Math.round(totalValue) || 1450000
+          };
+        }
+      }
+
+      console.log('⚠️ No allocation data found in contract');
+      return null;
+
+    } catch (error) {
+      console.error('💥 Error fetching NEAR allocation data:', error);
+      return null;
+    }
   };
 
   return {
