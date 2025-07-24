@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
-import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, MOCK_USDC_ADDRESS } from '@/utils/contracts';
+import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
 
 export const VaultActions: React.FC = () => {
   const { address, isConnected, chainId } = useAccount();
@@ -24,6 +24,15 @@ export const VaultActions: React.FC = () => {
       return null;
     }
   })() : null;
+  
+  // Get USDC address for current network
+  const usdcAddress = isChainSupported && chainId ? (() => {
+    try {
+      return getUSDCAddress(chainId);
+    } catch {
+      return null;
+    }
+  })() : null;
 
   // Wait for transaction confirmation
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -35,12 +44,12 @@ export const VaultActions: React.FC = () => {
 
   // Read user's USDC balance
   const { data: usdcBalance } = useReadContract({
-    address: MOCK_USDC_ADDRESS as `0x${string}`,
+    address: usdcAddress as `0x${string}` | undefined,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!chainId && isChainSupported,
+      enabled: !!address && !!chainId && isChainSupported && !!usdcAddress,
     },
   });
 
@@ -67,23 +76,23 @@ export const VaultActions: React.FC = () => {
 
   // Read current allowance
   const { data: allowance } = useReadContract({
-    address: MOCK_USDC_ADDRESS as `0x${string}`,
+    address: usdcAddress as `0x${string}` | undefined,
     abi: ERC20_ABI,
     functionName: 'allowance',
     args: address && contractAddress ? [address, contractAddress as `0x${string}`] : undefined,
     query: {
-      enabled: !!address && !!contractAddress,
+      enabled: !!address && !!contractAddress && !!usdcAddress,
     },
   });
 
   const handleApprove = async () => {
-    if (!address || !contractAddress || !depositAmount) return;
+    if (!address || !contractAddress || !depositAmount || !usdcAddress) return;
 
     try {
       setIsApproving(true);
       
       await writeContract({
-        address: MOCK_USDC_ADDRESS as `0x${string}`,
+        address: usdcAddress as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: [contractAddress as `0x${string}`, parseUnits(depositAmount, 6)], // USDC has 6 decimals

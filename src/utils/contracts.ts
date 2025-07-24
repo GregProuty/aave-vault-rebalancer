@@ -2,11 +2,13 @@
 export const CONTRACT_ADDRESSES = {
   localhost: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788',
   baseSepolia: '0xDEAfA3ba09ffF027F0dA4c8Ba79C238A547aeBd3', // AaveVault on Base Sepolia
-  // MockUSDC on Base Sepolia: 0x16f18Ee01365Ef23E0564dfB635215A5B4Eaa3c4
 } as const;
 
-// MockUSDC contract address (if needed for token approvals)
-export const MOCK_USDC_ADDRESS = '0x16f18Ee01365Ef23E0564dfB635215A5B4Eaa3c4';
+// USDC contract addresses for different networks
+export const USDC_ADDRESSES = {
+  localhost: '0x16f18Ee01365Ef23E0564dfB635215A5B4Eaa3c4', // MockUSDC for local testing
+  baseSepolia: '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8', // Real USDC on Base Sepolia testnet
+} as const;
 
 // ERC20 ABI for token operations (approve, balanceOf, etc.)
 export const ERC20_ABI = [
@@ -150,6 +152,18 @@ export const getContractAddress = (chainId: number): string => {
       return CONTRACT_ADDRESSES.localhost;
     case 84532: // Base Sepolia
       return CONTRACT_ADDRESSES.baseSepolia;
+    default:
+      throw new Error(`Unsupported chain ID: ${chainId}. Please switch to Base Sepolia (84532) or Localhost (31337) to interact with the deployed contracts.`);
+  }
+};
+
+// Helper function to get USDC address for current network
+export const getUSDCAddress = (chainId: number): string => {
+  switch (chainId) {
+    case 31337: // localhost
+      return USDC_ADDRESSES.localhost;
+    case 84532: // Base Sepolia
+      return USDC_ADDRESSES.baseSepolia;
     default:
       throw new Error(`Unsupported chain ID: ${chainId}. Please switch to Base Sepolia (84532) or Localhost (31337) to interact with the deployed contracts.`);
   }
