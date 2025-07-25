@@ -65,7 +65,8 @@ export const useAavePerformanceData = (days: number = 30) => {
 
     try {
       // Test backend connection first
-      const response = await fetch('http://localhost:4000/health');
+      const backendUrl = process.env.NEXT_PUBLIC_GRAPHQL_URL?.replace('/graphql', '') || 'http://localhost:4000';
+      const response = await fetch(`${backendUrl}/health`);
       if (!response.ok) {
         throw new Error('Backend server not available');
       }
