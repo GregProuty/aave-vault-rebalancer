@@ -367,22 +367,26 @@ export const VaultActions: React.FC = () => {
             )}
             
             {/* Approval and Deposit Buttons */}
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 w-full">
               {needsApproval && depositAmount && (
                 <button
                   onClick={handleApprove}
                   disabled={!depositAmount || depositError !== null || isApproving || isPending || isConfirming}
-                  className="flex-1 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+                  className="flex-1 min-w-0 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-2 rounded-lg transition-colors text-sm"
                 >
-                  {isApproving || (isPending && !isDepositing && !isWithdrawing) || isConfirming ? 'Approving...' : 'Approve USDC'}
+                  <span className="truncate block">
+                    {isApproving || (isPending && !isDepositing && !isWithdrawing) || isConfirming ? 'Approving...' : 'Approve USDC'}
+                  </span>
                 </button>
               )}
               <button
                 onClick={handleDeposit}
                 disabled={!depositAmount || depositError !== null || needsApproval || isDepositing || isPending || isConfirming}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+                className="flex-1 min-w-0 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-2 rounded-lg transition-colors text-sm"
               >
-                {isDepositing || (isPending && !isApproving && !isWithdrawing) || isConfirming ? 'Depositing...' : 'Deposit'}
+                <span className="truncate block">
+                  {isDepositing || (isPending && !isApproving && !isWithdrawing) || isConfirming ? 'Depositing...' : 'Deposit'}
+                </span>
               </button>
             </div>
             
@@ -421,9 +425,11 @@ export const VaultActions: React.FC = () => {
             <button
               onClick={handleWithdraw}
               disabled={!withdrawAmount || withdrawError !== null || isWithdrawing || isPending || isConfirming}
-              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
             >
-              {isWithdrawing || (isPending && !isDepositing && !isApproving) || isConfirming ? 'Withdrawing...' : 'Withdraw'}
+              <span className="truncate block">
+                {isWithdrawing || (isPending && !isDepositing && !isApproving) || isConfirming ? 'Withdrawing...' : 'Withdraw'}
+              </span>
             </button>
           </div>
         </div>
