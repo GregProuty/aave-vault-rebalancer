@@ -13,6 +13,9 @@ const PerformanceChart = ({
   height = 200 
 }: PerformanceChartProps) => {
   const { vaultPerformanceData, loading, vaultData } = usePerformanceData();
+  
+  // Debug mode - set to false to remove debugging visuals
+  const DEBUG_MODE = false;
 
   if (loading) {
     return (
@@ -59,8 +62,8 @@ const PerformanceChart = ({
     yAxisValues.push(value);
   }
 
-  // Chart dimensions accounting for axis space (increased bottom for time labels)
-  const chartMargin = { left: 60, right: 20, top: 20, bottom: 45 };
+  // Chart dimensions accounting for axis space (increased left margin for Y-axis label spacing)
+  const chartMargin = { left: 75, right: 20, top: 20, bottom: 45 };
   const chartWidth = width - chartMargin.left - chartMargin.right;
   const chartHeight = height - chartMargin.top - chartMargin.bottom;
 
@@ -171,6 +174,18 @@ const PerformanceChart = ({
                 strokeDasharray="2,2"
               />
               {/* Y-axis label */}
+              {DEBUG_MODE && (
+                <rect
+                  x={chartMargin.left - 55}
+                  y={y - 8}
+                  width={45}
+                  height={16}
+                  fill="rgba(0,255,0,0.1)"
+                  stroke="green"
+                  strokeWidth="1"
+                  strokeDasharray="1,1"
+                />
+              )}
               <text
                 x={chartMargin.left - 10}
                 y={y + 4}
@@ -178,6 +193,8 @@ const PerformanceChart = ({
                 fontSize="11"
                 textAnchor="end"
                 fontFamily="monospace"
+                stroke={DEBUG_MODE ? "green" : undefined}
+                strokeWidth={DEBUG_MODE ? "0.3" : undefined}
               >
                 {formatSharePrice(yAxisValues[yAxisSteps - i])}
               </text>
@@ -280,15 +297,29 @@ const PerformanceChart = ({
           Vault Share Price vs Baseline AAVE {hasNoData ? '(Collecting Real Data)' : !isUsingRealData ? '(Projected Growth)' : ''}
         </text>
         
-        {/* Y-axis label */}
+        {/* Y-axis label - moved further left to avoid overlap */}
+        {DEBUG_MODE && (
+          <rect
+            x={chartMargin.left - 68}
+            y={chartMargin.top + chartHeight / 2 - 30}
+            width={16}
+            height={60}
+            fill="rgba(255,0,0,0.1)"
+            stroke="red"
+            strokeWidth="1"
+            strokeDasharray="2,2"
+          />
+        )}
         <text
-          x={15}
+          x={chartMargin.left - 60}
           y={chartMargin.top + chartHeight / 2}
           fill="rgba(255, 255, 255, 0.6)"
-          fontSize="11"
+          fontSize="10"
           textAnchor="middle"
           fontFamily="system-ui"
-          transform={`rotate(-90 15 ${chartMargin.top + chartHeight / 2})`}
+          transform={`rotate(-90 ${chartMargin.left - 60} ${chartMargin.top + chartHeight / 2})`}
+          stroke={DEBUG_MODE ? "red" : undefined}
+          strokeWidth={DEBUG_MODE ? "0.5" : undefined}
         >
           Share Price
         </text>
