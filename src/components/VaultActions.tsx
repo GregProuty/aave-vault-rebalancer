@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
+import { validateAmount, validateChainId, DepositSchema, WithdrawSchema, ApprovalSchema } from '@/lib/validation';
 
 export const VaultActions: React.FC = () => {
   const { address, isConnected, chainId } = useAccount();
@@ -14,9 +15,79 @@ export const VaultActions: React.FC = () => {
   const [isApproving, setIsApproving] = useState(false);
   const [isDepositing, setIsDepositing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  
+  // Validation state
+  const [depositError, setDepositError] = useState<string | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [chainError, setChainError] = useState<string | null>(null);
 
-  // Check if current chain is supported
+  // Check if current chain is supported and validate
   const isChainSupported = chainId === 31337 || chainId === 84532;
+  
+  // Validate chain on change
+  useMemo(() => {
+    if (chainId) {
+      const error = validateChainId(chainId);
+      setChainError(error);
+    }
+  }, [chainId]);
+  
+  // Validate deposit amount
+  const validateDepositAmount = (amount: string) => {
+    if (!amount) {
+      setDepositError(null);
+      return;
+    }
+    
+    const maxBalance = usdcBalance ? formatUnits(usdcBalance as bigint, 6) : '0';
+    const error = validateAmount(amount, maxBalance);
+    setDepositError(error);
+    
+    if (!address || !contractAddress || !usdcAddress) {
+      setDepositError('Invalid addresses');
+      return;
+    }
+    
+    // Validate with Zod schema
+    try {
+      DepositSchema.parse({
+        amount,
+        userAddress: address,
+        contractAddress,
+        tokenAddress: usdcAddress
+      });
+         } catch {
+       setDepositError('Invalid deposit data');
+     }
+  };
+  
+  // Validate withdraw amount
+  const validateWithdrawAmount = (amount: string) => {
+    if (!amount) {
+      setWithdrawError(null);
+      return;
+    }
+    
+    const maxShares = shareBalance ? formatUnits(shareBalance as bigint, 18) : '0';
+    const error = validateAmount(amount, maxShares);
+    setWithdrawError(error);
+    
+    if (!address || !contractAddress) {
+      setWithdrawError('Invalid addresses');
+      return;
+    }
+    
+    // Validate with Zod schema
+    try {
+      WithdrawSchema.parse({
+        amount,
+        userAddress: address,
+        contractAddress
+      });
+         } catch {
+       setWithdrawError('Invalid withdrawal data');
+     }
+  };
   const contractAddress = isChainSupported && chainId ? (() => {
     try {
       return getContractAddress(chainId);
@@ -87,9 +158,18 @@ export const VaultActions: React.FC = () => {
 
   const handleApprove = async () => {
     if (!address || !contractAddress || !depositAmount || !usdcAddress) return;
+    if (depositError) return; // Don't proceed if there are validation errors
 
     try {
       setIsApproving(true);
+      
+      // Validate approval data
+      ApprovalSchema.parse({
+        amount: depositAmount,
+        spenderAddress: contractAddress,
+        tokenAddress: usdcAddress,
+        userAddress: address
+      });
       
       await writeContract({
         address: usdcAddress as `0x${string}`,
@@ -125,6 +205,7 @@ export const VaultActions: React.FC = () => {
 
   const handleWithdraw = async () => {
     if (!address || !contractAddress || !withdrawAmount) return;
+    if (withdrawError) return; // Don't proceed if there are validation errors
 
     try {
       setIsWithdrawing(true);
@@ -186,6 +267,9 @@ export const VaultActions: React.FC = () => {
         <h3 className="text-lg font-semibold text-white mb-4">Vault Actions</h3>
         <div className="text-center py-8">
           <p className="text-yellow-400 mb-4">⚠️ Unsupported Network</p>
+          {chainError && (
+            <p className="text-red-400 text-sm mb-2">{chainError}</p>
+          )}
           <p className="text-gray-400 text-sm mb-4">
             Please switch to one of the supported networks:
           </p>
@@ -266,17 +350,28 @@ export const VaultActions: React.FC = () => {
             <input
               type="number"
               value={depositAmount}
-              onChange={(e) => setDepositAmount(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setDepositAmount(value);
+                validateDepositAmount(value);
+              }}
               placeholder="0.0"
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className={`w-full bg-gray-700 border rounded-lg px-3 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:ring-1 ${
+                depositError 
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                  : 'border-gray-600 focus:border-blue-500 focus:ring-blue-500'
+              }`}
             />
+            {depositError && (
+              <div className="text-red-400 text-xs mt-1">{depositError}</div>
+            )}
             
             {/* Approval and Deposit Buttons */}
             <div className="flex space-x-2">
               {needsApproval && depositAmount && (
                 <button
                   onClick={handleApprove}
-                  disabled={!depositAmount || isApproving || isPending || isConfirming}
+                  disabled={!depositAmount || depositError !== null || isApproving || isPending || isConfirming}
                   className="flex-1 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
                 >
                   {isApproving || (isPending && !isDepositing && !isWithdrawing) || isConfirming ? 'Approving...' : 'Approve USDC'}
@@ -284,7 +379,7 @@ export const VaultActions: React.FC = () => {
               )}
               <button
                 onClick={handleDeposit}
-                disabled={!depositAmount || needsApproval || isDepositing || isPending || isConfirming}
+                disabled={!depositAmount || depositError !== null || needsApproval || isDepositing || isPending || isConfirming}
                 className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
               >
                 {isDepositing || (isPending && !isApproving && !isWithdrawing) || isConfirming ? 'Depositing...' : 'Deposit'}
@@ -308,13 +403,24 @@ export const VaultActions: React.FC = () => {
             <input
               type="number"
               value={withdrawAmount}
-              onChange={(e) => setWithdrawAmount(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setWithdrawAmount(value);
+                validateWithdrawAmount(value);
+              }}
               placeholder="0.0"
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className={`w-full bg-gray-700 border rounded-lg px-3 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:ring-1 ${
+                withdrawError 
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                  : 'border-gray-600 focus:border-blue-500 focus:ring-blue-500'
+              }`}
             />
+            {withdrawError && (
+              <div className="text-red-400 text-xs mt-1">{withdrawError}</div>
+            )}
             <button
               onClick={handleWithdraw}
-              disabled={!withdrawAmount || isWithdrawing || isPending || isConfirming}
+              disabled={!withdrawAmount || withdrawError !== null || isWithdrawing || isPending || isConfirming}
               className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
             >
               {isWithdrawing || (isPending && !isDepositing && !isApproving) || isConfirming ? 'Withdrawing...' : 'Withdraw'}

@@ -7,7 +7,7 @@ export const CONTRACT_ADDRESSES = {
 // USDC contract addresses for different networks
 export const USDC_ADDRESSES = {
   localhost: '0x16f18Ee01365Ef23E0564dfB635215A5B4Eaa3c4', // MockUSDC for local testing
-  baseSepolia: '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8', // Real USDC on Base Sepolia testnet
+  baseSepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Circle's official USDC on Base Sepolia testnet
 } as const;
 
 // ERC20 ABI for token operations (approve, balanceOf, etc.)
