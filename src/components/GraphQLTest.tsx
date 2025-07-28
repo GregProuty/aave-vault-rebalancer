@@ -33,6 +33,18 @@ const GraphQLTest = () => {
     return <div className="text-orange-400 text-sm">⚠️ No performance data available</div>;
   }
 
+  // Check if we have real data or if it's all zeros (empty database)
+  const hasRealData = data.performanceMetrics.totalDaysTracked > 0 && 
+                      parseFloat(data.performanceMetrics.totalGain) !== 0;
+
+  if (!hasRealData) {
+    return (
+      <div className="text-blue-400 text-sm">
+        ✅ GraphQL Connected - Waiting for real performance data...
+      </div>
+    );
+  }
+
   return (
     <div className="text-green-400 text-sm">
       ✅ GraphQL Connected: {data.performanceMetrics.totalDaysTracked} days, ${data.performanceMetrics.totalGain} total gain
