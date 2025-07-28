@@ -273,7 +273,7 @@ const PerformanceChart = ({
               {/* Vault line legend */}
               <line x1="0" y1="0" x2="20" y2="0" stroke="rgba(34, 197, 94, 0.9)" strokeWidth="2.5" />
               <text x="25" y="4" fill="rgba(255, 255, 255, 0.8)" fontSize="11" fontFamily="system-ui">
-                Vault Performance ({isUsingRealData ? 'Live' : 'Projected'})
+                Vault Performance ({isUsingRealData ? 'Live' : 'No Data'})
               </text>
               
               {/* Baseline line legend */}
@@ -294,7 +294,7 @@ const PerformanceChart = ({
           textAnchor="middle"
           fontFamily="system-ui"
         >
-          Vault Share Price vs Baseline AAVE {hasNoData ? '(Collecting Real Data)' : !isUsingRealData ? '(Projected Growth)' : ''}
+          Vault Share Price vs Baseline AAVE {hasNoData ? '(No Data Yet)' : '(Live Data)'}
         </text>
         
         {/* Y-axis label - moved further left to avoid overlap */}
@@ -337,7 +337,7 @@ const PerformanceChart = ({
         </text>
         
         {/* Data source indicator */}
-        {hasNoData ? (
+        {hasNoData && (
           <text
             x={chartMargin.left + chartWidth / 2}
             y={chartMargin.top + chartHeight / 2}
@@ -346,18 +346,7 @@ const PerformanceChart = ({
             textAnchor="middle"
             fontFamily="system-ui"
           >
-            No performance data yet - collecting real AAVE data...
-          </text>
-        ) : !isUsingRealData && (
-          <text
-            x={chartMargin.left + chartWidth - 5}
-            y={chartMargin.top + chartHeight - 5}
-            fill="rgba(255, 165, 0, 0.8)"
-            fontSize="10"
-            textAnchor="end"
-            fontFamily="monospace"
-          >
-            ⚠️ Mock Data
+            No performance data yet - waiting for vault deposits...
           </text>
         )}
       </svg>

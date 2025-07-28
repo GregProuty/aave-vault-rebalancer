@@ -18,8 +18,14 @@ const Allocation = ({ allocations }: AllocationProps) => {
     <div className="bg-[#1a1a1a] border border-[#333] text-white p-6 rounded-lg w-full max-w-md">
       <h2 className="text-xl font-medium mb-6">Allocation</h2>
       
-      <div className="space-y-4">
-        {allocations.map((item, index) => (
+      {allocations.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="text-gray-400 text-sm mb-2">No allocation data available</div>
+          <div className="text-gray-500 text-xs">Waiting for real cross-chain data...</div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {allocations.map((item, index) => (
           <div key={index} className="flex items-center justify-between">
             {/* Left side - Icon and name */}
             <div className="flex items-center space-x-3 flex-1">
@@ -50,16 +56,19 @@ const Allocation = ({ allocations }: AllocationProps) => {
               </span>
             </div>
           </div>
-        ))}
-      </div>
-      
-      {/* Data source indicator */}
-      <div className="mt-4 pt-3 border-t border-[#333]">
-        <div className="flex items-center justify-center space-x-1 text-xs text-gray-500">
-          <span className="text-green-400">●</span>
-          <span>Live data from rebalancer-2.testnet</span>
+          ))}
         </div>
-      </div>
+      )}
+      
+      {/* Data source indicator - only show if we have data */}
+      {allocations.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-[#333]">
+          <div className="flex items-center justify-center space-x-1 text-xs text-gray-500">
+            <span className="text-green-400">●</span>
+            <span>Live data from NEAR contract</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

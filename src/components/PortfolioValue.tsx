@@ -37,7 +37,6 @@ const PortfolioValue = ({ totalValue, gains, apy }: PortfolioValueProps) => {
     if (!percentage && percentage !== 0) return '0.00';
     // Ensure we show a reasonable APY format
     if (percentage > 100) return (percentage / 100).toFixed(2);
-    if (percentage < 0.01) return '4.47'; // Default reasonable APY
     return percentage.toFixed(2);
   };
 

@@ -6,64 +6,57 @@ import { usePerformanceData } from '@/hooks/usePerformanceData';
 const ActivityGraphQL = () => {
   const { performanceData, vaultData, loading } = usePerformanceData();
 
-  // Create mock activity based on real data
+  // Show real activity only when vault has actual data
   const getRecentActivity = () => {
-    if (!performanceData.length) return [];
-    
-    const recentData = performanceData.slice(-5); // Last 5 days
     const activities = [];
 
-    // Add performance tracking events based on new vault data
-    const latestSharePrice = vaultData ? vaultData.sharePrice.toFixed(4) : '1.0000';
-    const performance24h = vaultData ? vaultData.performance24h.toFixed(2) : '0.00';
-    
-    activities.push({
-      type: 'success',
-      time: '2m ago',
-      message: `Share price updated: $${latestSharePrice} (${performance24h}% 24h)`
-    });
+    // Only show activities if vault has real assets
+    if (vaultData && parseFloat(vaultData.totalAssets) > 0) {
+      const latestSharePrice = vaultData.sharePrice.toFixed(4);
+      const performance24h = vaultData.performance24h.toFixed(2);
+      const totalAssets = parseFloat(vaultData.totalAssets).toFixed(2);
+      
+      activities.push({
+        type: 'success',
+        time: '2m ago',
+        message: `Share price: $${latestSharePrice} (${performance24h}% 24h)`
+      });
 
-    if (recentData.length > 0 && recentData[recentData.length - 1].differential) {
-      const latestGain = parseFloat(recentData[recentData.length - 1].differential);
-      if (!isNaN(latestGain)) {
-        activities.push({
-          type: latestGain > 0 ? 'success' : 'info',
-          time: '1h ago',
-          message: `Performance vs baseline: ${latestGain > 0 ? '+' : ''}${(latestGain * 100).toFixed(3)}%`
-        });
+      // Show performance data if available
+      if (performanceData.length > 0) {
+        const latestData = performanceData[performanceData.length - 1];
+        const latestGain = parseFloat(latestData.differential);
+        if (!isNaN(latestGain)) {
+          activities.push({
+            type: latestGain > 0 ? 'success' : 'info',
+            time: '1h ago',
+            message: `Performance vs baseline: ${latestGain > 0 ? '+' : ''}${(latestGain * 100).toFixed(3)}%`
+          });
+        }
       }
+
+      activities.push({
+        type: 'info',
+        time: '3h ago',
+        message: `Total vault assets: $${totalAssets}`
+      });
+    } else {
+      // Show waiting state when no real data
+      activities.push({
+        type: 'info',
+        time: 'Now',
+        message: 'Waiting for vault deposits...'
+      });
     }
-
-    activities.push({
-      type: 'info',
-      time: '3h ago',
-      message: `Vault tracking: Base chain active`
-    });
-
-    activities.push({
-      type: 'success',
-      time: '6h ago',
-      message: 'All chain data synchronized'
-    });
-
-    // Total assets info
-    const totalAssets = vaultData ? `$${parseFloat(vaultData.totalAssets).toFixed(2)}` : '$0.00';
-    
-    activities.push({
-      type: 'info',
-      time: '12h ago',
-      message: `Total vault assets: ${totalAssets}`
-    });
 
     return activities;
   };
 
   const statusEvents = [
-    '✅ GraphQL backend connected (localhost:4000)',
-    '✅ Database connection active',
-    '📊 Performance tracking enabled',
-    '🔄 Real-time data synchronization',
-    `📈 ${performanceData.length} days of historical data`
+    `📈 ${performanceData.length} days of historical data available`,
+    ...(vaultData && parseFloat(vaultData.totalAssets) > 0 ? 
+      ['✅ Vault has active deposits'] : 
+      ['⏳ Waiting for first deposit'])
   ];
 
   if (loading) {

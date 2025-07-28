@@ -6,7 +6,7 @@ interface StatusMessage {
 }
 
 interface StatusPanelProps {
-  nextRebalanceTime: string;
+  nextRebalanceTime: string | null;
   messages: StatusMessage[];
 }
 
@@ -38,7 +38,7 @@ const StatusPanel = ({ nextRebalanceTime, messages }: StatusPanelProps) => {
   };
 
   return (
-    <div className="bg-[#1a1a1a] border border-[#333] text-white p-4 w-full rounded-lg space-y-3">
+    <div className="bg-[#1a1a1a] border border-[#333] text-white p-4 w-full rounded-lg space-y-3 h-[90%] min-h-[350px] flex flex-col">
       {/* Header with logo and title */}
       <div className="flex items-center space-x-3 mb-4">
         {/* Aave logo placeholder - geometric shape */}
@@ -49,14 +49,16 @@ const StatusPanel = ({ nextRebalanceTime, messages }: StatusPanelProps) => {
       </div>
 
       {/* Status messages */}
-      <div className="space-y-3">
-        {/* Next rebalancing message */}
-        <div className="border border-[#333] rounded-lg p-3">
-          <div className="flex items-center space-x-2">
-            <span>⏰</span>
-            <span className="text-gray-300 text-sm">Next rebalancing in {nextRebalanceTime}</span>
+      <div className="space-y-3 flex-1 flex flex-col justify-start">
+        {/* Next rebalancing message - only show if we have real data */}
+        {nextRebalanceTime && (
+          <div className="border border-[#333] rounded-lg p-3">
+            <div className="flex items-center space-x-2">
+              <span>⏰</span>
+              <span className="text-gray-300 text-sm">Next rebalancing in {nextRebalanceTime}</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Other status messages */}
         {messages.map((message, index) => (
@@ -67,6 +69,9 @@ const StatusPanel = ({ nextRebalanceTime, messages }: StatusPanelProps) => {
             </div>
           </div>
         ))}
+        
+        {/* Spacer to push content up */}
+        <div className="flex-1"></div>
       </div>
     </div>
   );

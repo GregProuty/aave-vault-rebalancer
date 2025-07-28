@@ -32,12 +32,13 @@ export default function Home() {
           {/* Left - Status Panel */}
           <div className="col-span-3">
             <StatusPanel 
-              nextRebalanceTime="6h 25m"
+              nextRebalanceTime={null}
               messages={[
-                { text: hasError ? "GraphQL backend disconnected - check console" : "GraphQL backend connected", type: hasError ? "error" : "success" },
-                { text: "Real-time performance tracking active", type: "success" },
-                { text: `Tracking ${performanceLoading ? "..." : "30"} days of data`, type: "info" },
-                { text: "Connect Ethereum wallet to deposit", type: "warning" }
+                { text: hasError ? "GraphQL backend disconnected - check console" : "GraphQL backend connected", type: hasError ? "error" : "success" as const },
+                ...(allocationsError || performanceError ? [] : [
+                  { text: "Data collection active", type: "success" as const }
+                ]),
+                { text: "Connect Ethereum wallet to deposit", type: "warning" as const }
               ]}
             />
             <div className="mt-2">

@@ -98,41 +98,10 @@ export const useAllocationData = () => {
           return;
         }
 
-        // Fallback to mock data if NEAR contract fails
-        console.log('⚠️ Using fallback allocation data');
-        const fallbackAllocations: AllocationItem[] = [
-          {
-            name: 'Ethereum',
-            icon: 'Ξ',
-            apy: 4.7,
-            allocation: 35,
-            color: '#627EEA'
-          },
-          {
-            name: 'Base',
-            icon: 'B',
-            apy: 3.3,
-            allocation: 25,
-            color: '#0052FF'
-          },
-          {
-            name: 'Polygon',
-            icon: 'P', 
-            apy: 2.4,
-            allocation: 20,
-            color: '#8247E5'
-          },
-          {
-            name: 'Avalanche',
-            icon: 'A',
-            apy: 4.0,
-            allocation: 20,
-            color: '#E84142'
-          }
-        ];
-
-        setAllocations(fallbackAllocations);
-        setTotalValue(1230000);
+        // No fallback data - show empty state instead
+        console.log('⚠️ NEAR contract data not available');
+        setAllocations([]);
+        setTotalValue(0);
 
       } catch (err) {
         console.error('💥 Error in fetchAllocationData:', err);

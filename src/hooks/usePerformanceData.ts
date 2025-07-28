@@ -131,38 +131,14 @@ export function usePerformanceData() {
   const vaultData: VaultData | null = vaultResult?.vaultData || null;
   const chainData: ChainData[] = chainResult?.allChainData || [];
 
-  // Generate performance comparison data
+  // Generate performance comparison data - only from real data
   const performanceData: VaultPerformancePoint[] = (() => {
-    // Use mock data if we don't have real historical data or vault is empty
-    const shouldUseMockData = sharePriceHistory.length === 0 || (vaultData && parseFloat(vaultData.totalAssets) === 0);
+    // Only show data if we have real historical data and vault has assets
+    const hasRealData = sharePriceHistory.length > 0 && vaultData && parseFloat(vaultData.totalAssets) > 0;
     
-    if (shouldUseMockData) {
-      // Generate mock data if no real data yet (vault is empty)
-      const mockData: VaultPerformancePoint[] = [];
-      const baselineAPY = 0.033; // 3.3% baseline AAVE APY
-      const vaultAPY = 0.035; // Slightly better with optimization
-      const startValue = 1.0;
-      
-      for (let i = 0; i < days; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - (days - 1 - i));
-        
-        // Calculate compound growth
-        const vaultValue = startValue * Math.pow(1 + vaultAPY/365, i);
-        const baselineValue = startValue * Math.pow(1 + baselineAPY/365, i);
-        const differential = vaultValue - baselineValue;
-        const differentialPercentage = (differential / baselineValue) * 100;
-        
-        mockData.push({
-          date: date.toISOString().split('T')[0],
-          vaultSharePrice: vaultValue,
-          baselineValue: baselineValue,
-          differential: differential,
-          differentialPercentage: differentialPercentage
-        });
-      }
-      
-      return mockData;
+    if (!hasRealData) {
+      // Return empty array - no mock data
+      return [];
     }
     
     // Process real share price data
