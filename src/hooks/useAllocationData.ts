@@ -20,7 +20,13 @@ const PROTOCOL_ICONS: Record<string, string> = {
   'arbitrum': 'AR',
   'optimism': 'O',
   'binance': 'B',
-  'near': 'N'
+  'near': 'N',
+  // Testnets
+  'localhost': 'L',
+  'base sepolia': 'B',
+  'arbitrum sepolia': 'AR',
+  'optimism sepolia': 'O',
+  'ethereum sepolia': 'Ξ'
 };
 
 const PROTOCOL_COLORS: Record<string, string> = {
@@ -31,11 +37,18 @@ const PROTOCOL_COLORS: Record<string, string> = {
   'arbitrum': '#213147',
   'optimism': '#FF0420',
   'binance': '#F3BA2F',
-  'near': '#00D395'
+  'near': '#00D395',
+  // Testnets
+  'localhost': '#888888',
+  'base sepolia': '#0052FF',
+  'arbitrum sepolia': '#213147',
+  'optimism sepolia': '#FF0420',
+  'ethereum sepolia': '#627EEA'
 };
 
 const getChainName = (chainId: number): string => {
   const chainNames: Record<number, string> = {
+    // Mainnets
     1: 'Ethereum',
     137: 'Polygon', 
     43114: 'Avalanche',
@@ -43,7 +56,13 @@ const getChainName = (chainId: number): string => {
     42161: 'Arbitrum',
     10: 'Optimism',
     56: 'Binance',
-    // Add more chain IDs as needed
+    // Testnets
+    31337: 'Localhost',
+    84532: 'Base Sepolia',
+    421614: 'Arbitrum Sepolia', 
+    11155420: 'Optimism Sepolia',
+    11155111: 'Ethereum Sepolia',
+    111155111: 'Ethereum Sepolia'
   };
   return chainNames[chainId] || `Chain ${chainId}`;
 };
@@ -58,7 +77,13 @@ const calculateEstimatedAPY = (protocol: string): number => {
     'arbitrum': 3.5,
     'optimism': 3.2,
     'binance': 5.1,
-    'near': 7.2
+    'near': 7.2,
+    // Testnets (using similar rates as mainnets)
+    'localhost': 3.5,
+    'base sepolia': 3.8,
+    'arbitrum sepolia': 3.5,
+    'optimism sepolia': 3.2,
+    'ethereum sepolia': 4.2
   };
   return apyEstimates[protocol.toLowerCase()] || 3.5;
 };
@@ -67,10 +92,27 @@ const formatAmount = (amount: string): number => {
   try {
     // Convert from wei/smallest unit to readable format
     const bigIntAmount = BigInt(amount);
-    return Number(bigIntAmount) / 1e18;
+    const result = Number(bigIntAmount) / 1e18;
+    
+    // For very small amounts (likely test data), treat non-zero as meaningful
+    if (result > 0 && result < 1e-10) {
+      return Number(bigIntAmount); // Return raw amount for test data
+    }
+    
+    return result;
   } catch {
     return 0;
   }
+};
+
+// Get all supported chains that should be displayed
+const getAllSupportedChains = (): number[] => {
+  return [
+    84532,     // Base Sepolia
+    421614,    // Arbitrum Sepolia  
+    11155420,  // Optimism Sepolia
+    111155111, // Ethereum Sepolia (actual chain ID from contract)
+  ];
 };
 
 export const useAllocationData = () => {
@@ -98,9 +140,22 @@ export const useAllocationData = () => {
           return;
         }
 
-        // No fallback data - show empty state instead
-        console.log('⚠️ NEAR contract data not available');
-        setAllocations([]);
+        // Fallback: Show all supported chains 
+        console.log('⚠️ NEAR contract data not available, showing supported chains');
+        const supportedChains = getAllSupportedChains();
+        
+        const fallbackAllocations: AllocationItem[] = supportedChains.map((chainId) => {
+          const chainName = getChainName(chainId);
+          return {
+            name: chainName,
+            icon: PROTOCOL_ICONS[chainName.toLowerCase()] || chainName[0]?.toUpperCase() || '?',
+            apy: calculateEstimatedAPY(chainName),
+            allocation: 0,
+            color: PROTOCOL_COLORS[chainName.toLowerCase()] || '#666666'
+          };
+        });
+        
+        setAllocations(fallbackAllocations);
         setTotalValue(0);
 
       } catch (err) {
@@ -131,45 +186,75 @@ export const useAllocationData = () => {
       // Fetch allocation data using the new get_allocations method
       console.log('📞 Calling get_allocations method...');
       const chainAllocations = await nearReader.getAllocations().catch((error) => {
-        console.log('❌ get_allocations failed:', error.message);
+        console.error('❌ get_allocations failed:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
         return null;
       });
 
+      console.log('📋 getAllocations response:', chainAllocations);
+
+      // Get all supported chains
+      const supportedChains = getAllSupportedChains();
+      const formattedAllocations: AllocationItem[] = [];
+      let totalValue = 0;
+
+      // Process NEAR contract allocation data
       if (chainAllocations && Array.isArray(chainAllocations) && chainAllocations.length > 0) {
         console.log('📊 Raw chain allocations:', chainAllocations);
         
-        // Calculate total value from all chains
-        let totalValue = 0;
-        const formattedAllocations: AllocationItem[] = [];
-
+        // First, calculate total value from all allocations
         chainAllocations.forEach((allocation: ChainAllocation) => {
-          const chainName = getChainName(allocation.chainId);
           const amount = formatAmount(allocation.amount);
           totalValue += amount;
+          console.log(`📈 Chain ${allocation.chainId}: ${allocation.amount} raw -> ${amount} formatted`);
+        });
+
+        console.log(`💰 Total value across all chains: ${totalValue}`);
+
+        // Calculate raw total for better test data handling
+        const rawTotal = chainAllocations.reduce((sum, ca) => sum + Number(ca.amount), 0);
+        console.log(`📊 Raw total: ${rawTotal}, Formatted total: ${totalValue}`);
+        
+        // Use raw amounts for calculation if total is very small (likely test data)
+        const useRawAmounts = totalValue < 1e-10 && rawTotal > 0;
+        console.log(`🔄 Using ${useRawAmounts ? 'raw' : 'formatted'} amounts for allocation calculation`);
+
+        // Create allocation items for ALL supported chains
+        supportedChains.forEach(chainId => {
+          const chainName = getChainName(chainId);
+          
+          // Find allocation data for this chain
+          const chainAllocation = chainAllocations.find((ca: ChainAllocation) => ca.chainId === chainId);
+          
+          let allocationPercent = 0;
+          if (chainAllocation) {
+            if (useRawAmounts) {
+              // Use raw amounts for test data
+              const rawAmount = Number(chainAllocation.amount);
+              allocationPercent = rawTotal > 0 ? Math.round((rawAmount / rawTotal) * 100) : 0;
+            } else {
+              // Use formatted amounts for real data
+              const amount = formatAmount(chainAllocation.amount);
+              allocationPercent = totalValue > 0 ? Math.round((amount / totalValue) * 100) : 0;
+            }
+          }
 
           formattedAllocations.push({
             name: chainName,
             icon: PROTOCOL_ICONS[chainName.toLowerCase()] || chainName[0]?.toUpperCase() || '?',
             apy: calculateEstimatedAPY(chainName),
-            allocation: 0, // Will be calculated as percentage after we have totalValue
+            allocation: allocationPercent,
             color: PROTOCOL_COLORS[chainName.toLowerCase()] || '#666666'
           });
 
-          console.log(`💰 Chain ${allocation.chainId} (${chainName}): ${amount} tokens`);
+          console.log(`🎯 ${chainName} (${chainId}): ${allocationPercent}% allocation`);
         });
 
-        // Calculate allocation percentages
-        formattedAllocations.forEach(allocation => {
-          const chainAmount = chainAllocations.find(ca => 
-            getChainName(ca.chainId) === allocation.name
-          );
-          if (chainAmount) {
-            const amount = formatAmount(chainAmount.amount);
-            allocation.allocation = totalValue > 0 ? Math.round((amount / totalValue) * 100) : 0;
-          }
-        });
-
-        console.log('✅ Processed allocation data:', {
+        console.log('✅ Final allocation data:', {
           totalValue,
           allocations: formattedAllocations
         });

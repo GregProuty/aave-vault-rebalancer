@@ -30,8 +30,12 @@ const Allocation = ({ allocations }: AllocationProps) => {
             {/* Left side - Icon and name */}
             <div className="flex items-center space-x-3 flex-1">
               <div 
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
-                style={{ backgroundColor: item.color }}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                style={{ 
+                  backgroundColor: item.color,
+                  minWidth: '2.5rem',
+                  minHeight: '2.5rem'
+                }}
               >
                 {item.icon}
               </div>
