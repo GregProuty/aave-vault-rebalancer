@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { WagmiProvider, http } from 'wagmi';
-import { mainnet, sepolia, baseSepolia, localhost } from 'wagmi/chains';
+import { mainnet, sepolia, baseSepolia, localhost, arbitrumSepolia, optimismSepolia } from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { ApolloProvider } from '@apollo/client';
@@ -13,12 +13,14 @@ import '@rainbow-me/rainbowkit/styles.css';
 const config = getDefaultConfig({
   appName: 'AAVE Vault Rebalancer',
   projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || 'your-project-id',
-  chains: [mainnet, sepolia, baseSepolia, localhost],
+  chains: [mainnet, sepolia, baseSepolia, localhost, arbitrumSepolia, optimismSepolia],
   transports: {
     [mainnet.id]: http(),
     [sepolia.id]: http(),
     [baseSepolia.id]: http(),
     [localhost.id]: http(),
+    [arbitrumSepolia.id]: http(),
+    [optimismSepolia.id]: http(),
   },
   ssr: false, // Disable SSR to avoid hydration issues
 });
