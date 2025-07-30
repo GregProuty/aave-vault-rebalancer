@@ -65,8 +65,8 @@ export const ChainIdSchema = z.union([
   z.literal(1), // Ethereum mainnet
   z.literal(8453), // Base mainnet
   z.literal(84532), // Base Sepolia testnet
-  z.literal(31337), // Local hardhat
   z.literal(11155111), // Sepolia testnet
+  z.literal(111155111), // Ethereum Sepolia testnet (actual contract chain ID)
   z.literal(10), // Optimism mainnet
   z.literal(11155420), // Optimism Sepolia testnet
   z.literal(137), // Polygon

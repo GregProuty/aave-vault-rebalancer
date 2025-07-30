@@ -22,7 +22,7 @@ export const VaultActions: React.FC = () => {
   const [chainError, setChainError] = useState<string | null>(null);
 
   // Check if current chain is supported and validate
-  const isChainSupported = chainId === 31337 || chainId === 84532;
+  const isChainSupported = chainId === 84532 || chainId === 421614 || chainId === 11155420 || chainId === 111155111;
   
   // Validate chain on change
   useMemo(() => {
@@ -114,7 +114,7 @@ export const VaultActions: React.FC = () => {
   });
 
   // Read user's USDC balance
-  const { data: usdcBalance } = useReadContract({
+  const { data: usdcBalance, refetch: refetchUsdcBalance } = useReadContract({
     address: usdcAddress as `0x${string}` | undefined,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
@@ -124,8 +124,21 @@ export const VaultActions: React.FC = () => {
     },
   });
 
+  // Debug USDC balance and contract info
+  React.useEffect(() => {
+    if (address && usdcAddress && chainId) {
+      console.log('💰 USDC Balance Debug:', {
+        userAddress: address,
+        usdcContractAddress: usdcAddress,
+        chainId: chainId,
+        rawBalance: usdcBalance?.toString(),
+        formattedBalance: usdcBalance ? formatUnits(usdcBalance as bigint, 6) : 'null'
+      });
+    }
+  }, [address, usdcAddress, chainId, usdcBalance]);
+
   // Read user's vault share balance
-  const { data: shareBalance } = useReadContract({
+  const { data: shareBalance, refetch: refetchShareBalance } = useReadContract({
     address: contractAddress as `0x${string}` | undefined,
     abi: AAVE_VAULT_ABI,
     functionName: 'balanceOf',
@@ -146,7 +159,7 @@ export const VaultActions: React.FC = () => {
   });
 
   // Read current allowance
-  const { data: allowance } = useReadContract({
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: usdcAddress as `0x${string}` | undefined,
     abi: ERC20_ABI,
     functionName: 'allowance',
@@ -156,12 +169,61 @@ export const VaultActions: React.FC = () => {
     },
   });
 
+  // Refetch data when transactions are confirmed
+  React.useEffect(() => {
+    if (isConfirmed) {
+      console.log('✅ Transaction confirmed, refetching balances...');
+      if (isApproving) {
+        console.log('🔄 Refetching allowance after approval');
+        refetchAllowance();
+        setIsApproving(false);
+      }
+      if (isDepositing) {
+        console.log('🔄 Refetching USDC and share balances after deposit');
+        refetchUsdcBalance();
+        refetchShareBalance();
+        setIsDepositing(false);
+      }
+      if (isWithdrawing) {
+        console.log('🔄 Refetching USDC and share balances after withdrawal');
+        refetchUsdcBalance();
+        refetchShareBalance();
+        setIsWithdrawing(false);
+      }
+    }
+  }, [isConfirmed, isApproving, isDepositing, isWithdrawing, refetchAllowance, refetchUsdcBalance, refetchShareBalance]);
+
+  // Debug contract addresses and transaction state
+  React.useEffect(() => {
+    if (address && chainId) {
+      console.log('🏗️ Contract Address Debug:', {
+        chainId: chainId,
+        vaultContract: contractAddress,
+        usdcContract: usdcAddress,
+        userAddress: address,
+        isChainSupported: isChainSupported
+      });
+    }
+  }, [address, chainId, contractAddress, usdcAddress, isChainSupported]);
+
+  // Debug transaction states
+  React.useEffect(() => {
+    console.log('🔄 Transaction States:', {
+      isApproving,
+      isDepositing, 
+      isWithdrawing,
+      isConfirmed,
+      isPending
+    });
+  }, [isApproving, isDepositing, isWithdrawing, isConfirmed, isPending]);
+
   const handleApprove = async () => {
     if (!address || !contractAddress || !depositAmount || !usdcAddress) return;
     if (depositError) return; // Don't proceed if there are validation errors
 
     try {
       setIsApproving(true);
+      console.log('✅ Starting approval for maximum amount...');
       
       // Validate approval data
       ApprovalSchema.parse({
@@ -171,16 +233,20 @@ export const VaultActions: React.FC = () => {
         userAddress: address
       });
       
+      // Approve maximum amount so user doesn't need to approve again
+      const maxApproval = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'); // 2^256 - 1
+      
       await writeContract({
         address: usdcAddress as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [contractAddress as `0x${string}`, parseUnits(depositAmount, 6)], // USDC has 6 decimals
+        args: [contractAddress as `0x${string}`, maxApproval],
       });
+      
+      console.log('📝 Approval transaction submitted, waiting for confirmation...');
     } catch (err) {
       console.error('Approve failed:', err);
-    } finally {
-      setIsApproving(false);
+      setIsApproving(false); // Only reset on error
     }
   };
 
@@ -189,6 +255,7 @@ export const VaultActions: React.FC = () => {
 
     try {
       setIsDepositing(true);
+      console.log('💸 Starting deposit:', depositAmount, 'USDC');
       
       await writeContract({
         address: contractAddress as `0x${string}`,
@@ -196,10 +263,11 @@ export const VaultActions: React.FC = () => {
         functionName: 'deposit',
         args: [parseUnits(depositAmount, 6), address], // USDC has 6 decimals
       });
+      
+      console.log('📝 Deposit transaction submitted, waiting for confirmation...');
     } catch (err) {
       console.error('Deposit failed:', err);
-    } finally {
-      setIsDepositing(false);
+      setIsDepositing(false); // Only reset on error
     }
   };
 
@@ -209,6 +277,7 @@ export const VaultActions: React.FC = () => {
 
     try {
       setIsWithdrawing(true);
+      console.log('💳 Starting withdrawal:', withdrawAmount, 'USDC');
       
       await writeContract({
         address: contractAddress as `0x${string}`,
@@ -216,10 +285,11 @@ export const VaultActions: React.FC = () => {
         functionName: 'withdraw',
         args: [parseUnits(withdrawAmount, 6), address, address], // USDC has 6 decimals
       });
+      
+      console.log('📝 Withdrawal transaction submitted, waiting for confirmation...');
     } catch (err) {
       console.error('Withdraw failed:', err);
-    } finally {
-      setIsWithdrawing(false);
+      setIsWithdrawing(false); // Only reset on error
     }
   };
 
@@ -275,7 +345,9 @@ export const VaultActions: React.FC = () => {
           </p>
           <div className="space-y-2 text-sm">
             <div className="text-blue-400">• Base Sepolia (Chain ID: 84532)</div>
-            <div className="text-green-400">• Localhost (Chain ID: 31337)</div>
+            <div className="text-purple-400">• Arbitrum Sepolia (Chain ID: 421614)</div>
+            <div className="text-red-400">• Optimism Sepolia (Chain ID: 11155420)</div>
+            <div className="text-blue-300">• Ethereum Sepolia (Chain ID: 111155111)</div>
           </div>
         </div>
       </div>

@@ -1,15 +1,15 @@
 // Contract addresses for different networks
 export const CONTRACT_ADDRESSES = {
   localhost: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788',
-  baseSepolia: '0xDEAfA3ba09ffF027F0dA4c8Ba79C238A547aeBd3', // AaveVault on Base Sepolia
-  arbitrumSepolia: '', // To be deployed
+  baseSepolia: '', // To be deployed
+  arbitrumSepolia: '0x858a8afff11bfccb61e69da87eba1ecccc34c640', // AaveVault on Arbitrum Sepolia (deployed by coworker)
   optimismSepolia: '', // To be deployed
 } as const;
 
 // USDC contract addresses for different networks
 export const USDC_ADDRESSES = {
   localhost: '0x16f18Ee01365Ef23E0564dfB635215A5B4Eaa3c4', // MockUSDC for local testing
-  baseSepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Circle's official USDC on Base Sepolia testnet
+  baseSepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Circle's official USDC (reverting until coworker clarifies)
   arbitrumSepolia: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', // Circle's official USDC on Arbitrum Sepolia testnet
   optimismSepolia: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7', // Circle's official USDC on Optimism Sepolia testnet
 } as const;
