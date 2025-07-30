@@ -69,8 +69,8 @@ export const VaultActions: React.FC = () => {
     }
     
     // Calculate USDC value of user's shares (shares are typically 1:1 with USDC for this vault)
-    // ERC4626 shares usually have same decimals as underlying asset, but shares use 18 decimals
-    const userShares = shareBalance ? Number(formatUnits(shareBalance as bigint, 18)) : 0;
+    // ERC4626 shares use same decimals as underlying asset (6 decimals for USDC)
+    const userShares = shareBalance ? Number(formatUnits(shareBalance as bigint, 6)) : 0;
     
     // For simplicity, assume 1:1 share to USDC ratio (typical for new vaults)
     // In production, you'd call vault.convertToAssets(shareBalance) 
@@ -161,6 +161,20 @@ export const VaultActions: React.FC = () => {
       enabled: !!address && !!contractAddress,
     },
   });
+
+  // Debug share balance and vault balances
+  React.useEffect(() => {
+    if (address && shareBalance !== undefined) {
+      const formattedShares = shareBalance ? formatUnits(shareBalance as bigint, 6) : '0';
+      console.log('📊 Share Balance Debug:', {
+        userAddress: address,
+        rawShareBalance: shareBalance?.toString(),
+        formattedShares: formattedShares,
+        shareDecimals: '6 (same as USDC)',
+        hasShares: shareBalance ? shareBalance > BigInt(0) : false
+      });
+    }
+  }, [address, shareBalance]);
 
   // Read total assets in vault
   const { data: totalAssets } = useReadContract({
@@ -389,7 +403,7 @@ export const VaultActions: React.FC = () => {
           <div className="border-t border-gray-700 pt-4">
             <div className="text-green-400 font-medium">Your Vault Shares (LP Tokens)</div>
             <div className="text-white font-bold text-lg">
-              {shareBalance ? formatUnits(shareBalance as bigint, 18) : '0.000000'}
+              {shareBalance ? formatUnits(shareBalance as bigint, 6) : '0.000000'}
             </div>
             <div className="text-xs text-gray-400 mt-1 mb-3">
               These are your LP tokens representing your share of the vault
@@ -413,8 +427,8 @@ export const VaultActions: React.FC = () => {
             <div className="border-t border-gray-700 pt-4">
               <div className="text-blue-400">Your Share Value</div>
               <div className="text-white font-medium">
-                ≈ {shareBalance && totalAssets ? 
-                  formatUnits((shareBalance as bigint * totalAssets as bigint) / parseUnits("1", 18), 6) 
+                ≈ {shareBalance ? 
+                  formatUnits(shareBalance as bigint, 6) 
                   : '0.000000'} USDC
               </div>
               <div className="text-xs text-gray-400 mt-1">
