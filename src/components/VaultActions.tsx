@@ -61,15 +61,29 @@ export const VaultActions: React.FC = () => {
      }
   };
   
-  // Validate withdraw amount
+    // Validate withdraw amount
   const validateWithdrawAmount = (amount: string) => {
     if (!amount) {
       setWithdrawError(null);
       return;
     }
     
-    const maxShares = shareBalance ? formatUnits(shareBalance as bigint, 18) : '0';
-    const error = validateAmount(amount, maxShares);
+    // Calculate USDC value of user's shares (shares are typically 1:1 with USDC for this vault)
+    // ERC4626 shares usually have same decimals as underlying asset, but shares use 18 decimals
+    const userShares = shareBalance ? Number(formatUnits(shareBalance as bigint, 18)) : 0;
+    
+    // For simplicity, assume 1:1 share to USDC ratio (typical for new vaults)
+    // In production, you'd call vault.convertToAssets(shareBalance) 
+    const maxWithdrawableUSDC = userShares.toString();
+    
+    console.log('💳 Withdrawal Validation:', {
+      requestedAmount: amount,
+      userShares: userShares,
+      maxWithdrawableUSDC: maxWithdrawableUSDC,
+      rawShareBalance: shareBalance?.toString()
+    });
+    
+    const error = validateAmount(amount, maxWithdrawableUSDC);
     setWithdrawError(error);
     
     if (!address || !contractAddress) {
@@ -85,8 +99,8 @@ export const VaultActions: React.FC = () => {
         contractAddress
       });
          } catch {
-       setWithdrawError('Invalid withdrawal data');
-     }
+      setWithdrawError('Invalid withdrawal data');
+    }
   };
   const contractAddress = isChainSupported && chainId ? (() => {
     try {
