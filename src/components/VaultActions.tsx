@@ -6,6 +6,61 @@ import { parseUnits, formatUnits } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
 import { validateAmount, validateChainId, DepositSchema, WithdrawSchema, ApprovalSchema } from '@/lib/validation';
 
+// Mobile Number Pad Component
+const NumberPad = ({ onNumberClick, onBackspace, onClear }: {
+  onNumberClick: (num: string) => void;
+  onBackspace: () => void;
+  onClear: () => void;
+}) => {
+  const numbers = [
+    ['1', '2', '3'],
+    ['4', '5', '6'], 
+    ['7', '8', '9'],
+    ['', '0', '⌫']
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-4 p-4">
+      {numbers.flat().map((num, index) => (
+        <button
+          key={index}
+          onClick={() => {
+            if (num === '⌫') onBackspace();
+            else if (num === '') onClear();
+            else if (num) onNumberClick(num);
+          }}
+          className={`h-12 rounded-lg font-medium ${
+            num === '⌫' 
+              ? 'bg-gray-600 text-white' 
+              : num === ''
+              ? 'invisible'
+              : 'bg-gray-700 text-white hover:bg-gray-600'
+          }`}
+          disabled={num === ''}
+        >
+          {num}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// Mobile Modal Component
+const MobileModal = ({ isOpen, children }: {
+  isOpen: boolean;
+  children: React.ReactNode;
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden">
+      <div className="absolute inset-0 bg-[#0a0a0a]">
+        {children}
+      </div>
+    </div>
+  );
+};
+
 export const VaultActions: React.FC = () => {
   const { address, isConnected, chainId } = useAccount();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
@@ -20,6 +75,12 @@ export const VaultActions: React.FC = () => {
   const [depositError, setDepositError] = useState<string | null>(null);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [chainError, setChainError] = useState<string | null>(null);
+
+  // Mobile state
+  const [showMobileDeposit, setShowMobileDeposit] = useState(false);
+  const [showMobileWithdraw, setShowMobileWithdraw] = useState(false);
+  const [mobileAmount, setMobileAmount] = useState('');
+  const [mobileStep, setMobileStep] = useState<'input' | 'confirm' | 'progress' | 'success' | 'error'>('input');
 
   // Check if current chain is supported and validate
   const isChainSupported = chainId === 84532 || chainId === 421614 || chainId === 11155420 || chainId === 111155111;
@@ -348,6 +409,129 @@ export const VaultActions: React.FC = () => {
     }
   };
 
+  // Mobile handlers
+  const handleMobileNumberInput = (num: string) => {
+    setMobileAmount(prev => prev + num);
+  };
+
+  const handleMobileBackspace = () => {
+    setMobileAmount(prev => prev.slice(0, -1));
+  };
+
+  const handleMobileClear = () => {
+    setMobileAmount('');
+  };
+
+  const handleMobileDeposit = () => {
+    setShowMobileDeposit(true);
+    setMobileStep('input');
+    setMobileAmount('');
+  };
+
+  const handleMobileWithdraw = () => {
+    setShowMobileWithdraw(true);
+    setMobileStep('input');
+    setMobileAmount('');
+  };
+
+  const handleMobileConfirm = async () => {
+    if (!address || !contractAddress || !mobileAmount) return;
+    
+    setMobileStep('progress');
+    
+    try {
+      if (showMobileDeposit) {
+        // Mobile deposit flow
+        setIsDepositing(true);
+        console.log('💸 Starting mobile deposit:', mobileAmount, 'USDC');
+        
+        await writeContract({
+          address: contractAddress as `0x${string}`,
+          abi: AAVE_VAULT_ABI,
+          functionName: 'deposit',
+          args: [parseUnits(mobileAmount, 6), address], // USDC has 6 decimals
+        });
+        
+        console.log('📝 Mobile deposit transaction submitted');
+      } else if (showMobileWithdraw) {
+        // Mobile withdraw flow  
+        setIsWithdrawing(true);
+        console.log('💳 Starting mobile withdrawal:', mobileAmount, 'USDC');
+        
+        await writeContract({
+          address: contractAddress as `0x${string}`,
+          abi: AAVE_VAULT_ABI,
+          functionName: 'withdraw',
+          args: [parseUnits(mobileAmount, 6), address, address], // USDC has 6 decimals
+        });
+        
+        console.log('📝 Mobile withdrawal transaction submitted');
+      }
+    } catch (err) {
+      console.error('Mobile transaction failed:', err);
+      setMobileStep('error');
+      setIsDepositing(false);
+      setIsWithdrawing(false);
+    }
+  };
+
+  const handleMobileApprove = async () => {
+    if (!address || !contractAddress || !mobileAmount || !usdcAddress) return;
+    
+    setMobileStep('progress');
+    setIsApproving(true);
+    
+    try {
+      console.log('✅ Starting mobile approval...');
+      
+      // Approve maximum amount so user doesn't need to approve again
+      const maxApproval = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+      
+      await writeContract({
+        address: usdcAddress as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [contractAddress as `0x${string}`, maxApproval],
+      });
+      
+      console.log('📝 Mobile approval transaction submitted');
+    } catch (err) {
+      console.error('Mobile approval failed:', err);
+      setMobileStep('error');
+      setIsApproving(false);
+    }
+  };
+
+  const handleMobileClose = () => {
+    setShowMobileDeposit(false);
+    setShowMobileWithdraw(false);
+    setMobileStep('input');
+    setMobileAmount('');
+  };
+
+  // Monitor transaction confirmation for mobile flows
+  React.useEffect(() => {
+    if (hash && (showMobileDeposit || showMobileWithdraw)) {
+      if (isConfirmed) {
+        if (isApproving) {
+          // Approval completed, move to deposit confirmation
+          setMobileStep('confirm');
+          setIsApproving(false);
+        } else {
+          // Deposit/withdraw completed
+          setMobileStep('success');
+          setIsDepositing(false);
+          setIsWithdrawing(false);
+          // Refetch balances
+          refetchUsdcBalance();
+          refetchShareBalance();
+        }
+      } else if (isConfirming) {
+        setMobileStep('progress');
+      }
+    }
+  }, [hash, isConfirmed, isConfirming, isApproving, showMobileDeposit, showMobileWithdraw, refetchUsdcBalance, refetchShareBalance]);
+
   if (!isConnected) {
     return (
       <div className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
@@ -387,8 +571,10 @@ export const VaultActions: React.FC = () => {
   const needsApproval = depositAmountBigInt > currentAllowance;
 
   return (
-    <div className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
-      <h3 className="text-lg font-semibold text-white mb-6">Vault Actions</h3>
+    <>
+      {/* Desktop Layout */}
+      <div className="hidden md:block bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
+        <h3 className="text-lg font-semibold text-white mb-6">Vault Actions</h3>
       
       {/* Vault Stats */}
       <div className="mb-6 p-4 bg-gray-800 rounded-lg">
@@ -553,14 +739,305 @@ export const VaultActions: React.FC = () => {
         </div>
       )}
 
-      {/* Error Display */}
-      {error && (
-        <div className="mt-4 p-3 bg-red-900 rounded-lg">
-          <div className="text-sm text-red-200">
-            Error: {error.message}
+        {/* Error Display */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-900 rounded-lg">
+            <div className="text-sm text-red-200">
+              Error: {error.message}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Layout */}
+      <div className="md:hidden">
+        {/* Mobile Balance Card */}
+        <div className="bg-[#1a1a1a] rounded-lg p-4 border border-gray-800 mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium text-white">Balance</h3>
+            <button className="text-blue-400 text-sm">Add to Wallet</button>
+          </div>
+          
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-lg">$</span>
+            </div>
+            <div>
+              <div className="text-2xl font-light text-white">
+                {shareBalance ? Number(formatUnits(shareBalance as bigint, 6)).toLocaleString() : '0'}
+              </div>
+              <div className="text-gray-400 text-sm">
+                {shareBalance ? formatUnits(shareBalance as bigint, 6) : '0.0000'} LP Shares
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-gray-400 text-sm mb-4">
+            4.87% APY
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleMobileWithdraw}
+              className="bg-gray-700 text-white py-3 px-4 rounded-lg font-medium"
+            >
+              Withdraw
+            </button>
+            <button
+              onClick={handleMobileDeposit}
+              className="bg-white text-black py-3 px-4 rounded-lg font-medium"
+            >
+              Deposit
+            </button>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+
+      {/* Mobile Deposit Modal */}
+      <MobileModal isOpen={showMobileDeposit}>
+        {mobileStep === 'input' && (
+          <div className="p-4 pt-12">
+            <div className="text-center mb-8">
+              <h2 className="text-xl font-medium text-white mb-2">Deposit</h2>
+              <div className="text-gray-400 text-sm">Enter amount in USDC</div>
+            </div>
+            
+            <div className="mb-8">
+              <div className="text-center text-4xl font-light text-white mb-2">
+                {mobileAmount || '0'}
+              </div>
+              <div className="text-center text-gray-400 text-sm">USDC</div>
+            </div>
+            
+            <NumberPad
+              onNumberClick={handleMobileNumberInput}
+              onBackspace={handleMobileBackspace}
+              onClear={handleMobileClear}
+            />
+            
+            <div className="p-4 space-y-3">
+              <button
+                onClick={handleMobileClose}
+                className="w-full bg-gray-700 text-white py-3 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // Check if approval is needed
+                  const mobileAmountBigInt = mobileAmount ? parseUnits(mobileAmount, 6) : BigInt(0);
+                  const currentAllowance = allowance as bigint || BigInt(0);
+                  const needsApproval = mobileAmountBigInt > currentAllowance;
+                  
+                  if (needsApproval) {
+                    handleMobileApprove();
+                  } else {
+                    setMobileStep('confirm');
+                  }
+                }}
+                disabled={!mobileAmount}
+                className="w-full bg-white text-black py-3 rounded-lg font-medium disabled:bg-gray-600 disabled:text-gray-400"
+              >
+                {(() => {
+                  const mobileAmountBigInt = mobileAmount ? parseUnits(mobileAmount, 6) : BigInt(0);
+                  const currentAllowance = allowance as bigint || BigInt(0);
+                  const needsApproval = mobileAmountBigInt > currentAllowance;
+                  return needsApproval ? 'Approve USDC' : 'Continue';
+                })()}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mobileStep === 'confirm' && (
+          <div className="p-4 pt-12">
+            <div className="text-center mb-8">
+              <h2 className="text-xl font-medium text-white mb-2">Deposit</h2>
+              <div className="text-gray-400 text-sm">Confirm transaction</div>
+            </div>
+            
+            <div className="mb-8">
+              <div className="text-center text-4xl font-light text-white mb-2">
+                {mobileAmount}
+              </div>
+              <div className="text-center text-gray-400 text-sm">USDC</div>
+            </div>
+            
+            <div className="p-4 space-y-3">
+              <button
+                onClick={handleMobileClose}
+                className="w-full bg-gray-700 text-white py-3 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMobileConfirm}
+                className="w-full bg-white text-black py-3 rounded-lg font-medium"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mobileStep === 'progress' && (
+          <div className="p-4 pt-12 text-center">
+            <h2 className="text-xl font-medium text-white mb-4">Deposit in progress...</h2>
+            <div className="mb-8">
+              <div className="text-4xl font-light text-white mb-2">{mobileAmount}</div>
+              <div className="text-gray-400 text-sm">USDC</div>
+            </div>
+            <div className="animate-spin w-8 h-8 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
+          </div>
+        )}
+
+        {mobileStep === 'success' && (
+          <div className="p-4 pt-12 text-center">
+            <div className="text-green-400 text-sm mb-4">Your deposit was successful! ✅</div>
+            <div className="mb-8">
+              <div className="text-4xl font-light text-white mb-2">{mobileAmount}</div>
+              <div className="text-gray-400 text-sm">USDC deposited</div>
+            </div>
+            <button
+              onClick={handleMobileClose}
+              className="w-full bg-white text-black py-3 rounded-lg font-medium"
+            >
+              Done
+            </button>
+          </div>
+        )}
+
+        {mobileStep === 'error' && (
+          <div className="p-4 pt-12 text-center">
+            <div className="text-red-400 text-sm mb-4">Your deposit failed. Please try again!</div>
+            <div className="mb-8">
+              <div className="text-4xl font-light text-white mb-2">{mobileAmount}</div>
+              <div className="text-gray-400 text-sm">USDC</div>
+            </div>
+            <button
+              onClick={handleMobileClose}
+              className="w-full bg-white text-black py-3 rounded-lg font-medium"
+            >
+              Done
+            </button>
+          </div>
+        )}
+      </MobileModal>
+
+      {/* Mobile Withdraw Modal */}
+      <MobileModal isOpen={showMobileWithdraw}>
+        {mobileStep === 'input' && (
+          <div className="p-4 pt-12">
+            <div className="text-center mb-8">
+              <h2 className="text-xl font-medium text-white mb-2">Withdraw</h2>
+              <div className="text-gray-400 text-sm">
+                You can withdraw from Yieldr with one click below. The transaction typically
+                takes 5 minutes and will arrive to the same wallet you connected.
+              </div>
+            </div>
+            
+            <div className="bg-gray-800 rounded-lg p-4 mb-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Deposits</span>
+                <span className="text-white">{mobileAmount || '1230'} USDC</span>
+              </div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Yield</span>
+                <span className="text-white">247 USDC</span>
+              </div>
+              <div className="border-t border-gray-600 pt-2 mt-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Total</span>
+                  <span className="text-white">1477 USDC</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 space-y-3">
+              <button
+                onClick={handleMobileClose}
+                className="w-full bg-gray-700 text-white py-3 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setMobileStep('confirm')}
+                className="w-full bg-white text-black py-3 rounded-lg font-medium"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mobileStep === 'progress' && (
+          <div className="p-4 pt-12 text-center">
+            <h2 className="text-xl font-medium text-white mb-4">Withdrawal in progress...</h2>
+            <div className="bg-gray-800 rounded-lg p-4 mb-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Deposits</span>
+                <span className="text-white">1230 USDC</span>
+              </div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Yield</span>
+                <span className="text-white">247 USDC</span>
+              </div>
+              <div className="border-t border-gray-600 pt-2 mt-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Total</span>
+                  <span className="text-white">1477 USDC</span>
+                </div>
+              </div>
+            </div>
+            <div className="animate-spin w-8 h-8 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
+          </div>
+        )}
+
+        {mobileStep === 'success' && (
+          <div className="p-4 pt-12 text-center">
+            <div className="text-green-400 text-sm mb-4">Your withdrawal was successful! ✅</div>
+            <div className="bg-gray-800 rounded-lg p-4 mb-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Deposits</span>
+                <span className="text-white">1230 USDC</span>
+              </div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Yield</span>
+                <span className="text-white">247 USDC</span>
+              </div>
+              <div className="border-t border-gray-600 pt-2 mt-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Total</span>
+                  <span className="text-white">1477 USDC</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <button className="w-full bg-gray-700 text-white py-3 rounded-lg">
+                View transaction
+              </button>
+              <button
+                onClick={handleMobileClose}
+                className="w-full bg-white text-black py-3 rounded-lg font-medium"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mobileStep === 'error' && (
+          <div className="p-4 pt-12 text-center">
+            <div className="text-red-400 text-sm mb-4">Your withdrawal failed. Please try again!</div>
+            <button
+              onClick={handleMobileClose}
+              className="w-full bg-white text-black py-3 rounded-lg font-medium"
+            >
+              Done
+            </button>
+          </div>
+        )}
+      </MobileModal>
+    </>
   );
 }; 

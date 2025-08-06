@@ -6,11 +6,13 @@ import { usePerformanceData } from '@/hooks/usePerformanceData';
 interface PerformanceChartProps {
   width?: number;
   height?: number;
+  isMobile?: boolean;
 }
 
 const PerformanceChart = ({ 
   width = 600, 
-  height = 200 
+  height = 200,
+  isMobile = false
 }: PerformanceChartProps) => {
   const { vaultPerformanceData, loading, vaultData } = usePerformanceData();
   
@@ -62,8 +64,10 @@ const PerformanceChart = ({
     yAxisValues.push(value);
   }
 
-  // Chart dimensions accounting for axis space (increased left margin for Y-axis label spacing)
-  const chartMargin = { left: 75, right: 20, top: 20, bottom: 45 };
+  // Chart dimensions - simplified for mobile
+  const chartMargin = isMobile 
+    ? { left: 10, right: 10, top: 10, bottom: 10 }
+    : { left: 75, right: 20, top: 20, bottom: 45 };
   const chartWidth = width - chartMargin.left - chartMargin.right;
   const chartHeight = height - chartMargin.top - chartMargin.bottom;
 
@@ -155,6 +159,78 @@ const PerformanceChart = ({
     });
   }
 
+  // Mobile simplified rendering
+  if (isMobile) {
+    return (
+      <div className="relative w-full h-full">
+        <svg width={width} height={height} className="absolute bottom-0 left-0">
+          {/* Simple gradient background */}
+          <defs>
+            <linearGradient id="mobileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="rgba(99, 102, 241, 0.3)" />
+              <stop offset="100%" stopColor="rgba(99, 102, 241, 0.1)" />
+            </linearGradient>
+          </defs>
+          
+          {/* Background area */}
+          <rect 
+            x={chartMargin.left} 
+            y={chartMargin.top} 
+            width={chartWidth} 
+            height={chartHeight}
+            fill="url(#mobileGradient)"
+            rx="4"
+          />
+          
+          {/* Simple performance line */}
+          {hasNoData ? (
+            // Mock upward trending line when no data
+            <>
+              <path
+                d={`M ${chartMargin.left} ${chartMargin.top + chartHeight * 0.8} 
+                   Q ${chartMargin.left + chartWidth * 0.3} ${chartMargin.top + chartHeight * 0.6} 
+                   ${chartMargin.left + chartWidth * 0.6} ${chartMargin.top + chartHeight * 0.4}
+                   Q ${chartMargin.left + chartWidth * 0.8} ${chartMargin.top + chartHeight * 0.3}
+                   ${chartMargin.left + chartWidth} ${chartMargin.top + chartHeight * 0.2}`}
+                stroke="rgba(99, 102, 241, 0.8)"
+                strokeWidth="2"
+                fill="none"
+                strokeDasharray="3,3"
+                opacity="0.6"
+              />
+              {/* Dots along the line */}
+              <circle cx={chartMargin.left + chartWidth * 0.3} cy={chartMargin.top + chartHeight * 0.6} r="2" fill="rgba(99, 102, 241, 0.8)" />
+              <circle cx={chartMargin.left + chartWidth * 0.6} cy={chartMargin.top + chartHeight * 0.4} r="2" fill="rgba(99, 102, 241, 0.8)" />
+              <circle cx={chartMargin.left + chartWidth} cy={chartMargin.top + chartHeight * 0.2} r="2" fill="rgba(99, 102, 241, 0.8)" />
+            </>
+          ) : (
+            // Real data rendering
+            <>
+              {vaultPath && (
+                <path
+                  d={vaultPath}
+                  stroke="rgba(99, 102, 241, 1)"
+                  strokeWidth="2"
+                  fill="none"
+                />
+              )}
+              {baselinePath && (
+                <path
+                  d={baselinePath}
+                  stroke="rgba(255, 165, 0, 0.8)"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeDasharray="4,4"
+                />
+              )}
+            </>
+          )}
+        </svg>
+      </div>
+    );
+  }
+
+  // Desktop rendering
   return (
     <div className="relative w-full h-full">
       <svg width={width} height={height} className="absolute bottom-10 left-0">
