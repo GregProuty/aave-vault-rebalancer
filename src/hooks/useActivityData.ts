@@ -1,0 +1,218 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useQuery } from '@apollo/client';
+import { gql } from '@apollo/client';
+import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
+
+// GraphQL query for activity data
+const GET_RECENT_ACTIVITY = gql`
+  query GetRecentActivity($limit: Int) {
+    recentActivity(limit: $limit) {
+      id
+      type
+      title
+      description
+      amount
+      chainName
+      userAddress
+      transactionHash
+      timestamp
+      icon
+    }
+  }
+`;
+
+export interface ActivityEntry {
+  id: string;
+  type: 'DEPOSIT' | 'WITHDRAWAL' | 'REBALANCE' | 'HARVEST' | 'ALLOCATION';
+  title: string;
+  description: string;
+  amount?: number;
+  chainName?: string;
+  userAddress?: string;
+  transactionHash?: string;
+  timestamp: string;
+  icon: string;
+}
+
+interface UseActivityDataReturn {
+  activities: ActivityEntry[];
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+
+export function useActivityData(limit: number = 20): UseActivityDataReturn {
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const { messages } = useTransactionStatus();
+  
+  const { data, loading, error, refetch } = useQuery(GET_RECENT_ACTIVITY, {
+    variables: { limit },
+    pollInterval: 30000, // Poll every 30 seconds for new data
+    errorPolicy: 'all'
+  });
+
+  // Helper function to format timestamp
+  const formatTimestamp = (timestamp: string): string => {
+    const now = new Date();
+    const activityTime = new Date(timestamp);
+    const diffInMinutes = Math.floor((now.getTime() - activityTime.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    
+    return activityTime.toLocaleDateString();
+  };
+
+  // Convert transaction status messages to activity entries
+  const getRecentTransactionActivities = (): ActivityEntry[] => {
+    return messages
+      .filter(msg => msg.type === 'success' && msg.txHash)
+      .map((msg, index) => {
+        const isDeposit = msg.message.toLowerCase().includes('deposit');
+        const isWithdraw = msg.message.toLowerCase().includes('withdraw');
+        const isApproval = msg.message.toLowerCase().includes('approval');
+        
+        // Skip approval messages as they're not user-facing activities
+        if (isApproval) return null;
+        
+        // Extract amount from message if possible
+        const amountMatch = msg.message.match(/(\d+(?:\.\d+)?)/);
+        const amount = amountMatch ? parseFloat(amountMatch[1]) : undefined;
+        
+        let type: ActivityEntry['type'] = 'DEPOSIT';
+        let icon = '/deposit.svg';
+        let title = msg.message;
+        
+        if (isWithdraw) {
+          type = 'WITHDRAWAL';
+          icon = '/withdraw.svg';
+        }
+        
+        return {
+          id: `tx_${msg.id}`,
+          type,
+          title,
+          description: 'Recent transaction',
+          amount,
+          transactionHash: msg.txHash,
+          timestamp: new Date(msg.timestamp).toISOString(),
+          icon
+        };
+      })
+      .filter(Boolean) as ActivityEntry[];
+  };
+
+  useEffect(() => {
+    if (data?.recentActivity) {
+      // Combine backend data with recent transaction status messages
+      const backendActivities = data.recentActivity.map((activity: any) => ({
+        ...activity,
+        timeAgo: formatTimestamp(activity.timestamp)
+      }));
+      
+      const recentTxActivities = getRecentTransactionActivities();
+      
+      // Merge and sort by timestamp
+      const allActivities = [...backendActivities, ...recentTxActivities]
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, limit)
+        .map(activity => ({
+          ...activity,
+          timeAgo: formatTimestamp(activity.timestamp)
+        }));
+      
+      setActivities(allActivities);
+    } else {
+      // If no backend data, show only recent transaction activities
+      const recentTxActivities = getRecentTransactionActivities()
+        .slice(0, limit)
+        .map(activity => ({
+          ...activity,
+          timeAgo: formatTimestamp(activity.timestamp)
+        }));
+      
+      setActivities(recentTxActivities);
+    }
+  }, [data, messages, limit]);
+
+  return {
+    activities,
+    loading,
+    error: error || null,
+    refetch
+  };
+}
+
+// Mock data fallback for when backend is not available
+export const getMockActivityData = (): ActivityEntry[] => [
+  {
+    id: 'mock_1',
+    type: 'REBALANCE',
+    title: 'Rebalanced 10% from Base to Ethereum',
+    description: 'Automated rebalancing for optimal yield',
+    amount: 500000,
+    chainName: 'ethereum',
+    timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    icon: '/rebalance.svg'
+  },
+  {
+    id: 'mock_2',
+    type: 'DEPOSIT',
+    title: 'Received deposit of $1,230',
+    description: 'from 0x345...',
+    amount: 1230,
+    userAddress: '0x345...',
+    timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    icon: '/deposit.svg'
+  },
+  {
+    id: 'mock_3',
+    type: 'HARVEST',
+    title: 'Harvested $527 yield',
+    description: 'Automatic yield collection',
+    amount: 527,
+    timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    icon: '/harvest.svg'
+  },
+  {
+    id: 'mock_4',
+    type: 'WITHDRAWAL',
+    title: 'Withdrawal of $820 initiated',
+    description: 'by 0x456...',
+    amount: 820,
+    userAddress: '0x456...',
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    icon: '/withdraw.svg'
+  },
+  {
+    id: 'mock_5',
+    type: 'ALLOCATION',
+    title: 'Allocated 40% to Ethereum',
+    description: 'Strategy adjustment',
+    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    icon: '/allocate.svg'
+  }
+].map(activity => ({
+  ...activity,
+  timeAgo: (() => {
+    const now = new Date();
+    const activityTime = new Date(activity.timestamp);
+    const diffInMinutes = Math.floor((now.getTime() - activityTime.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    
+    return `${Math.floor(diffInHours / 24)}d ago`;
+  })()
+}));
