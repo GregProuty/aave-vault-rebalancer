@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 interface AllocationItem {
   name: string;
@@ -15,12 +16,24 @@ interface AllocationProps {
 const Allocation = ({ allocations }: AllocationProps) => {
   console.log(allocations);
   
+  // Helper function to get chain icon
+  const getChainIcon = (chainName: string): string => {
+    const name = chainName.toLowerCase();
+    if (name.includes('ethereum')) return '/Chain=ETH.svg';
+    if (name.includes('base')) return '/Chain=BASE.svg';
+    if (name.includes('arbitrum')) return '/arbitrum-arb-logo.svg';
+    if (name.includes('optimism')) return '/optimism-ethereum-op-logo.svg';
+    if (name.includes('polygon')) return '/Chain=POL.svg';
+    if (name.includes('avalanche')) return '/Chain=AVA.svg';
+    return '/Chain=ETH.svg'; // Default fallback
+  };
+  
   // Mock data matching current app state - Ethereum 100%, others 0%
   const mockAllocations: AllocationItem[] = [
-    { name: "Base Sepolia", icon: "B", apy: 3.8, allocation: 0, color: "#0052ff" },
-    { name: "Arbitrum Sepolia", icon: "AR", apy: 3.5, allocation: 0, color: "#2d374b" },
-    { name: "Optimism Sepolia", icon: "O", apy: 3.2, allocation: 0, color: "#ff0420" },
-    { name: "Ethereum Sepolia", icon: "E", apy: 4.2, allocation: 100, color: "#627eea" },
+    { name: "Base Sepolia", icon: getChainIcon("Base"), apy: 3.8, allocation: 0, color: "#0052ff" },
+    { name: "Arbitrum Sepolia", icon: getChainIcon("Arbitrum"), apy: 3.5, allocation: 0, color: "#2d374b" },
+    { name: "Optimism Sepolia", icon: getChainIcon("Optimism"), apy: 3.2, allocation: 0, color: "#ff0420" },
+    { name: "Ethereum Sepolia", icon: getChainIcon("Ethereum"), apy: 4.2, allocation: 100, color: "#627eea" },
   ];
   
   const displayAllocations = allocations.length > 0 ? allocations : mockAllocations;
@@ -56,15 +69,13 @@ const Allocation = ({ allocations }: AllocationProps) => {
               <div key={index} className="flex items-center justify-between">
                 {/* Left side - Icon and name */}
                 <div className="flex items-center space-x-3 flex-1">
-                  <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-                    style={{ 
-                      backgroundColor: item.color,
-                      minWidth: '2.5rem',
-                      minHeight: '2.5rem'
-                    }}
-                  >
-                    {item.icon}
+                  <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                    <Image
+                      src={item.icon}
+                      alt={item.name}
+                      width={32}
+                      height={32}
+                    />
                   </div>
                   <span className="text-white font-medium">{item.name}</span>
                 </div>
@@ -127,12 +138,16 @@ const Allocation = ({ allocations }: AllocationProps) => {
         <div className="space-y-3">
           {displayAllocations.map((item, index) => (
             <div key={index} className="flex items-center justify-between">
-              {/* Left side - Dot and name */}
+              {/* Left side - Icon and name */}
               <div className="flex items-center space-x-3 flex-1">
-                <div 
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
+                <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                  <Image
+                    src={item.icon}
+                    alt={item.name}
+                    width={20}
+                    height={20}
+                  />
+                </div>
                 <span className="text-white text-sm">{item.name}</span>
                 <span className="text-gray-400 text-xs">{item.apy}% APY</span>
               </div>

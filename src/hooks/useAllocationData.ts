@@ -13,20 +13,20 @@ export interface AllocationItem {
 }
 
 const PROTOCOL_ICONS: Record<string, string> = {
-  'ethereum': 'Ξ',
-  'base': 'B', 
-  'polygon': 'P',
-  'avalanche': 'A',
-  'arbitrum': 'AR',
-  'optimism': 'O',
-  'binance': 'B',
-  'near': 'N',
+  'ethereum': '/Chain=ETH.svg',
+  'base': '/Chain=BASE.svg', 
+  'polygon': '/Chain=POL.svg',
+  'avalanche': '/Chain=AVA.svg',
+  'arbitrum': '/arbitrum-arb-logo.svg',
+  'optimism': '/optimism-ethereum-op-logo.svg',
+  'binance': '/Chain=BNB.svg',
+  'near': '/Chain=ETH.svg', // Using ETH as fallback
   // Testnets
-  'localhost': 'L',
-  'base sepolia': 'B',
-  'arbitrum sepolia': 'AR',
-  'optimism sepolia': 'O',
-  'ethereum sepolia': 'Ξ'
+  'localhost': '/Chain=ETH.svg',
+  'base sepolia': '/Chain=BASE.svg',
+  'arbitrum sepolia': '/arbitrum-arb-logo.svg',
+  'optimism sepolia': '/optimism-ethereum-op-logo.svg',
+  'ethereum sepolia': '/Chain=ETH.svg'
 };
 
 const PROTOCOL_COLORS: Record<string, string> = {
