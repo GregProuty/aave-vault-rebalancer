@@ -1,129 +1,45 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
+import { useActivityData, getMockActivityData } from '@/hooks/useActivityData';
+import Image from 'next/image';
 
 const ActivityGraphQL = () => {
-  const { performanceData, vaultData, loading } = usePerformanceData();
+  const { loading } = usePerformanceData();
+  const { activities, loading: activitiesLoading, error: activitiesError } = useActivityData(15);
+  const [timeRemaining, setTimeRemaining] = useState({ hours: 1, minutes: 25 });
 
-  // Mock activity data for mobile design
-  const getMobileActivity = () => [
-    {
-      type: 'deposit',
-      icon: '💰',
-      title: 'Rebalanced 10% from Base to Ethereum',
-      time: '2m ago',
-      amount: null
-    },
-    {
-      type: 'deposit',
-      icon: '💰',
-      title: 'Received deposit of $1,230 from Gr3ss',
-      time: '5m ago',
-      amount: '+$1,230'
-    },
-    {
-      type: 'yield',
-      icon: '📈',
-      title: 'Harvested $237 yield',
-      time: '1h ago',
-      amount: '+$237'
-    },
-    {
-      type: 'withdraw',
-      icon: '💸',
-      title: 'Withdraw of $810 initiated by Gr4ss',
-      time: '2h ago',
-      amount: '-$810'
-    },
-    {
-      type: 'deposit',
-      icon: '💰',
-      title: 'Received deposit to Ethereum',
-      time: '3h ago',
-      amount: '+$500'
-    },
-    {
-      type: 'info',
-      icon: '🔄',
-      title: 'Allocated 25% to Arbitrum',
-      time: '4h ago',
-      amount: null
-    },
-    {
-      type: 'info',
-      icon: '🔄',
-      title: 'Allocated 14% to Base',
-      time: '6h ago',
-      amount: null
-    },
-    {
-      type: 'info',
-      icon: '🔄',
-      title: 'Allocated 9% to BNB Chain',
-      time: '8h ago',
-      amount: null
-    }
-  ];
-
-  // Show real activity only when vault has actual data
-  const getRecentActivity = () => {
-    const activities = [];
-
-    // Only show activities if vault has real assets
-    if (vaultData && parseFloat(vaultData.totalAssets) > 0) {
-      const latestSharePrice = vaultData.sharePrice.toFixed(4);
-      const performance24h = vaultData.performance24h.toFixed(2);
-      const totalAssets = parseFloat(vaultData.totalAssets).toFixed(2);
-      
-      activities.push({
-        type: 'success',
-        time: '2m ago',
-        message: `Share price: $${latestSharePrice} (${performance24h}% 24h)`
-      });
-
-      // Show performance data if available
-      if (performanceData.length > 0) {
-        const latestData = performanceData[performanceData.length - 1];
-        const latestGain = parseFloat(latestData.differential);
-        if (!isNaN(latestGain)) {
-          activities.push({
-            type: latestGain > 0 ? 'success' : 'info',
-            time: '1h ago',
-            message: `Performance vs baseline: ${latestGain > 0 ? '+' : ''}${(latestGain * 100).toFixed(3)}%`
-          });
+  // Update countdown every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev.minutes > 0) {
+          return { ...prev, minutes: prev.minutes - 1 };
+        } else if (prev.hours > 0) {
+          return { hours: prev.hours - 1, minutes: 59 };
         }
-      }
-
-      activities.push({
-        type: 'info',
-        time: '3h ago',
-        message: `Total vault assets: $${totalAssets}`
+        return { hours: 1, minutes: 25 }; // Reset countdown
       });
-    } else {
-      // Show waiting state when no real data
-      activities.push({
-        type: 'info',
-        time: 'Now',
-        message: 'Waiting for vault deposits...'
-      });
-    }
+    }, 60000); // Update every minute
 
-    return activities;
-  };
+    return () => clearInterval(interval);
+  }, []);
 
-  const statusEvents = [
-    `📈 ${performanceData.length} days of historical data available`,
-    ...(vaultData && parseFloat(vaultData.totalAssets) > 0 ? 
-      ['✅ Vault has active deposits'] : 
-      ['⏳ Waiting for first deposit'])
-  ];
+  // Use real activity data or fallback to mock data
+  const displayActivities = activitiesError || activities.length === 0 
+    ? getMockActivityData() 
+    : activities;
 
   if (loading) {
     return (
-      <div className="bg-[#1a1a1a] border border-[#333] text-white rounded-lg h-full overflow-hidden">
-        <div className="p-4 border-b border-[#333]">
-          <h2 className="text-lg font-medium">Activity</h2>
+      <div className="bg-black border border-gray-700 text-white rounded-lg h-[480px] overflow-hidden">
+        <div className="p-4 flex justify-between items-center">
+          <h2 className="text-lg font-medium text-white">Activity</h2>
+          <div className="text-sm text-gray-400 flex items-center">
+            <span>Rebalancing in {timeRemaining.hours}h {timeRemaining.minutes}m</span>
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-2"></div>
+          </div>
         </div>
         <div className="p-4 flex items-center justify-center h-32">
           <div className="text-gray-400">Loading activity...</div>
@@ -132,100 +48,125 @@ const ActivityGraphQL = () => {
     );
   }
 
-  const activities = getRecentActivity();
-  const mobileActivities = getMobileActivity();
-
   return (
-    <div className="bg-[#1a1a1a] border border-[#333] text-white rounded-lg overflow-hidden">
+    <div className="bg-black border border-gray-700 text-white rounded-lg overflow-hidden h-[480px] flex flex-col">
       {/* Desktop Layout */}
-      <div className="hidden md:block">
-        {/* Header */}
-        <div className="p-4 border-b border-[#333]">
-          <h2 className="text-lg font-medium">Activity</h2>
+      <div className="hidden md:flex flex-col h-full">
+        {/* Header with countdown */}
+        <div className="p-4 flex justify-between items-center">
+          <h2 className="text-lg font-medium text-white">Activity</h2>
+          <div className="text-sm text-gray-400 flex items-center">
+            <span>Rebalancing in {timeRemaining.hours}h {timeRemaining.minutes}m</span>
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-2"></div>
+          </div>
         </div>
-        
-        {/* Content */}
-        <div className="flex flex-col">
-          {/* Recent Activity */}
-          <div className="p-4">
-            <h3 className="text-sm font-medium text-gray-300 mb-3">Recent Events</h3>
+
+        {/* Activity List - No borders, clean design */}
+        <div className="flex-1 p-4 pt-0 overflow-y-auto">
+          {activitiesLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-gray-400">Loading activity...</div>
+            </div>
+          ) : (
             <div className="space-y-3">
-              {activities.map((activity, index) => (
-                <div key={index} className="flex items-start space-x-3">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                    activity.type === 'success' ? 'bg-green-500' :
-                    activity.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
-                  }`} />
+              {displayActivities.map((activity, index) => (
+                <div key={activity.id || index} className="flex items-start space-x-3">
+                  <div className="w-6 h-6 flex items-center justify-center mt-0.5 flex-shrink-0">
+                    <Image
+                      src={activity.icon}
+                      alt={activity.type.toLowerCase()}
+                      width={16}
+                      height={16}
+                      className="filter brightness-0 invert"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-300 leading-relaxed">
-                      {activity.message}
+                    <p className="text-sm text-gray-400 leading-relaxed">
+                      {activity.title}
+                      {activity.description && (
+                        <span className="text-gray-500"> {activity.description}</span>
+                      )}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-xs text-gray-500">{activity.timeAgo}</p>
+                      {activity.transactionHash && (
+                        <a
+                          href={`https://basescan.org/tx/${activity.transactionHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300"
+                        >
+                          View Tx
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Status Events */}
-          <div className="border-t border-[#333] p-4">
-            <h3 className="text-sm font-medium text-gray-300 mb-3">System Status</h3>
-            <div className="space-y-2">
-              {statusEvents.map((event, index) => (
-                <div key={index} className="text-xs text-gray-400 font-mono">
-                  {event}
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Mobile Layout */}
       <div className="md:hidden">
-        {/* Header */}
-        <div className="p-4 border-b border-[#333] flex justify-between items-center">
-          <h2 className="text-lg font-medium">Activity</h2>
+        {/* Header with countdown */}
+        <div className="p-4 flex justify-between items-center">
+          <h2 className="text-lg font-medium text-white">Activity</h2>
           <div className="text-sm text-gray-400 flex items-center">
-            <span>Rebalancing in 5h 26m</span>
+            <span>Rebalancing in {timeRemaining.hours}h {timeRemaining.minutes}m</span>
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-2"></div>
           </div>
         </div>
         
         {/* Mobile Activity List */}
-        <div className="p-4">
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {mobileActivities.map((activity, index) => (
-              <div key={index} className="flex items-center justify-between py-2">
-                {/* Left side - Icon and details */}
-                <div className="flex items-center space-x-3 flex-1">
-                  <div className="w-8 h-8 bg-[#333] rounded-full flex items-center justify-center text-sm">
-                    {activity.icon}
+        <div className="p-4 pt-0">
+          {activitiesLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-gray-400">Loading activity...</div>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {displayActivities.map((activity, index) => (
+                <div key={activity.id || index} className="flex items-center space-x-3 py-2">
+                  <div className="w-8 h-8 bg-[#333] rounded-full flex items-center justify-center flex-shrink-0">
+                    <Image
+                      src={activity.icon}
+                      alt={activity.type.toLowerCase()}
+                      width={16}
+                      height={16}
+                      className="filter brightness-0 invert"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white leading-tight">
                       {activity.title}
+                      {activity.description && (
+                        <span className="text-gray-400"> {activity.description}</span>
+                      )}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{activity.time}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-gray-500">{activity.timeAgo}</p>
+                      {activity.transactionHash && (
+                        <a
+                          href={`https://basescan.org/tx/${activity.transactionHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300"
+                        >
+                          Tx
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
-                
-                {/* Right side - Amount */}
-                {activity.amount && (
-                  <div className={`text-sm font-medium ${
-                    activity.amount.startsWith('+') ? 'text-green-400' : 
-                    activity.amount.startsWith('-') ? 'text-red-400' : 'text-white'
-                  }`}>
-                    {activity.amount}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default ActivityGraphQL; 
+export default ActivityGraphQL;

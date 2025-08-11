@@ -12,15 +12,15 @@ export const EthereumWalletConnection: React.FC = () => {
   });
 
   return (
-    <div className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
+    <div className="text-white w-full h-full flex flex-col">
       {/* Desktop Layout */}
       <div className="hidden md:block">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Ethereum Wallet</h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-medium text-white">Ethereum Wallet</h3>
           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
         </div>
       
-      <div className="space-y-4">
+      <div className="space-y-4 flex-1 flex flex-col">
         <ConnectButton.Custom>
           {({
             account,
@@ -108,12 +108,12 @@ export const EthereumWalletConnection: React.FC = () => {
                         </button>
                       </div>
 
-                      <button
+                      <button 
                         onClick={openAccountModal}
-                        className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-3 px-4 rounded-lg transition-colors text-left"
+                        className="w-full bg-gray-800 hover:bg-gray-700 rounded-lg p-4 transition-colors"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">{account.displayName}</span>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">{account.displayName}</span>
                           <span className="text-xs text-gray-400">
                             {account.displayBalance
                               ? ` ${account.displayBalance}`
@@ -130,9 +130,9 @@ export const EthereumWalletConnection: React.FC = () => {
         </ConnectButton.Custom>
 
           {isConnected && (
-            <div className="mt-4 p-3 bg-gray-800 rounded-lg">
+            <div className="mt-4 p-4 bg-gray-800 rounded-lg">
               <div className="text-xs text-gray-400 mb-1">Wallet Balance</div>
-              <div className="text-sm text-white">
+              <div className="text-lg font-medium text-white">
                 {balance ? `${parseFloat(balance.formatted).toFixed(4)} ${balance.symbol}` : '0.0000 ETH'}
               </div>
               <div className="text-xs text-gray-400 mt-1">

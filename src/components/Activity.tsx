@@ -194,7 +194,7 @@ const Activity = () => {
   const activityEvents = generateActivityEvents();
 
   return (
-    <div className='bg-[#1a1a1a] border border-[#333] rounded-lg w-full p-4'>
+    <div className='bg-black border border-gray-700 rounded-lg w-full p-4'>
       <div className="flex items-center justify-between mb-2">
         <p className='text-2xl text-white'>Activity</p>
         {isLoading && (

@@ -38,21 +38,19 @@ const StatusPanel = ({ nextRebalanceTime, messages }: StatusPanelProps) => {
   };
 
   return (
-    <div className="bg-[#1a1a1a] border border-[#333] text-white p-4 w-full rounded-lg space-y-3 h-[90%] min-h-[350px] flex flex-col">
+    <div className="bg-black border border-gray-700 text-white p-4 w-full rounded-lg space-y-3 flex flex-col">
       {/* Header with logo and title */}
       <div className="flex items-center space-x-3 mb-4">
-        {/* Aave logo placeholder - geometric shape */}
-        <div className="w-10 h-10 border-2 border-white rounded-full flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-white rounded transform rotate-45"></div>
-        </div>
-        <h1 className="text-lg font-medium">Aave Rebalancer 9000</h1>
+        {/* Aave logo */}
+        <img src="/logo.svg" alt="Aave Logo" className="w-10 h-10" />
+        <h1 className="text-lg font-medium">YIELDR</h1>
       </div>
 
       {/* Status messages */}
-      <div className="space-y-3 flex-1 flex flex-col justify-start">
+      <div className="space-y-3">
         {/* Next rebalancing message - only show if we have real data */}
         {nextRebalanceTime && (
-          <div className="border border-[#333] rounded-lg p-3">
+          <div className="border border-gray-700 rounded-lg p-3">
             <div className="flex items-center space-x-2">
               <span>⏰</span>
               <span className="text-gray-300 text-sm">Next rebalancing in {nextRebalanceTime}</span>

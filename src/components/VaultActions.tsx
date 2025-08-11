@@ -534,7 +534,7 @@ export const VaultActions: React.FC = () => {
 
   if (!isConnected) {
     return (
-      <div className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
+      <div className="bg-black rounded-lg p-6 border border-gray-800">
         <h3 className="text-lg font-semibold text-white mb-4">Vault Actions</h3>
         <p className="text-gray-400 text-center py-8">
           Connect your wallet to deposit or withdraw from the vault
@@ -545,7 +545,7 @@ export const VaultActions: React.FC = () => {
 
   if (!isChainSupported) {
     return (
-      <div className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
+      <div className="bg-black rounded-lg p-6 border border-gray-800">
         <h3 className="text-lg font-semibold text-white mb-4">Vault Actions</h3>
         <div className="text-center py-8">
           <p className="text-yellow-400 mb-4">⚠️ Unsupported Network</p>
@@ -573,7 +573,7 @@ export const VaultActions: React.FC = () => {
   return (
     <>
       {/* Desktop Layout */}
-      <div className="hidden md:block bg-[#1a1a1a] rounded-lg p-6 border border-gray-800">
+      <div className="hidden md:block bg-black rounded-lg p-6 border border-gray-800">
         <h3 className="text-lg font-semibold text-white mb-6">Vault Actions</h3>
       
       {/* Vault Stats */}
@@ -752,7 +752,7 @@ export const VaultActions: React.FC = () => {
       {/* Mobile Layout */}
       <div className="md:hidden">
         {/* Mobile Balance Card */}
-        <div className="bg-[#1a1a1a] rounded-lg p-4 border border-gray-800 mb-4">
+        <div className="bg-black rounded-lg p-4 border border-gray-800 mb-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-white">Balance</h3>
             <button className="text-blue-400 text-sm">Add to Wallet</button>

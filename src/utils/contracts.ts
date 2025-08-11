@@ -1,7 +1,7 @@
 // Contract addresses for different networks
 export const CONTRACT_ADDRESSES = {
   localhost: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788',
-  baseSepolia: '', // To be deployed
+  baseSepolia: '0xa189176b780Db31024038aD1C8080f62d87d5aea', // AaveVault on Base Sepolia
   arbitrumSepolia: '0x858a8afff11bfccb61e69da87eba1ecccc34c640', // AaveVault on Arbitrum Sepolia (deployed by coworker)
   optimismSepolia: '', // To be deployed
 } as const;
@@ -9,7 +9,7 @@ export const CONTRACT_ADDRESSES = {
 // USDC contract addresses for different networks
 export const USDC_ADDRESSES = {
   localhost: '0x16f18Ee01365Ef23E0564dfB635215A5B4Eaa3c4', // MockUSDC for local testing
-  baseSepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Circle's official USDC (reverting until coworker clarifies)
+  baseSepolia: '0x23a4e6740F7b658Ad5041D1720b16508a725d53d', // MockUSDC for Base Sepolia testing
   arbitrumSepolia: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', // Circle's official USDC on Arbitrum Sepolia testnet
   optimismSepolia: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7', // Circle's official USDC on Optimism Sepolia testnet
 } as const;
@@ -98,6 +98,13 @@ export const AAVE_VAULT_ABI = [
   {
     "inputs": [],
     "name": "totalAssets",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalSupply",
     "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
     "stateMutability": "view",
     "type": "function"

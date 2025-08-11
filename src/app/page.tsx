@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import ActivityGraphQL from "@/components/ActivityGraphQL";
 import Allocation from "@/components/Allocation";
-import StatusPanel from "@/components/StatusPanel";
+import StatusPanelFigma from "@/components/StatusPanelFigma";
 import { EthereumWalletConnection } from "@/components/EthereumWalletConnection";
-import { VaultActions } from "@/components/VaultActions";
-import PortfolioValue from "@/components/PortfolioValue";
+import { BalanceFigma } from "@/components/BalanceFigma";
+import PerformanceChart from "@/components/PerformanceChart";
 import { useAllocationData } from "@/hooks/useAllocationData";
 import { usePerformanceData } from "@/hooks/usePerformanceData";
-import GraphQLTest from "@/components/GraphQLTest";
+import { TransactionStatusProvider } from "@/contexts/TransactionStatusContext";
+
 
 export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
@@ -33,9 +34,6 @@ export default function Home() {
 
   const { allocations, isLoading: allocationsLoading, error: allocationsError } = useAllocationData();
   const { 
-    totalValue, 
-    totalGains, 
-    currentApy, 
     loading: performanceLoading, 
     error: performanceError
   } = usePerformanceData();
@@ -92,7 +90,8 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <TransactionStatusProvider>
+      <div className="min-h-screen bg-[#0a0a0a] text-white">
       {/* Mobile Status Bar */}
       <div className="flex justify-between items-center p-4 pt-12 md:hidden">
         <div className="w-6 h-6">
@@ -110,74 +109,68 @@ export default function Home() {
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden md:block p-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Top row */}
-          <div className="grid grid-cols-12 gap-4 mb-4">
-            {/* Left - Status Panel */}
-            <div className="col-span-3">
-              <StatusPanel 
-                nextRebalanceTime={null}
-                messages={[
-                  { text: hasError ? "GraphQL backend disconnected - check console" : "GraphQL backend connected", type: hasError ? "error" : "success" as const },
-                  ...(allocationsError || performanceError ? [] : [
-                    { text: "Data collection active", type: "success" as const }
-                  ]),
-                  { text: "Connect Ethereum wallet to deposit", type: "warning" as const }
-                ]}
-              />
-              <div className="mt-2">
-                <GraphQLTest />
+      <div className="hidden md:block p-6">
+        <div className="w-full max-w-7xl mx-auto">
+
+          {/* Main Layout - 2 columns for better width utilization */}
+          <div className="grid grid-cols-12 gap-6 h-full">
+            {/* Left Column - Increased height to accommodate all components */}
+            <div className="col-span-4 flex flex-col">
+              <div className="bg-black border border-gray-700 rounded-lg text-white h-[900px] flex flex-col">
+                {/* Status Section - Fixed height */}
+                <div className="p-6 flex-shrink-0">
+                  <StatusPanelFigma />
+                </div>
+                
+                {/* Balance Section - Flexible height, no scrolling */}
+                <div className="p-6 flex-1">
+                  <BalanceFigma />
+                </div>
+                
+                {/* Wallet Section - Fixed height anchored to bottom */}
+                <div className="p-6 flex-shrink-0">
+                  <EthereumWalletConnection />
+                </div>
               </div>
             </div>
             
-            {/* Right - Portfolio Value (spans remaining columns) */}
-            <div className="col-span-9">
-              <PortfolioValue totalValue={totalValue} gains={totalGains} apy={currentApy} />
-            </div>
-          </div>
-          
-          {/* Main row */}
-          <div className="grid grid-cols-12 gap-4">
-            {/* Left - Wallet Connection */}
-            <div className="col-span-3">
-              <EthereumWalletConnection />
-            </div>
-            
-            {/* Center Left - Vault Actions */}
-            <div className="col-span-3">
-              <VaultActions />
-            </div>
-            
-            {/* Center Right - Allocation */}
-            <div className="col-span-3">
-              {isLoading ? (
-                <div className="bg-[#1a1a1a] border border-[#333] text-white p-6 rounded-lg">
-                  <h2 className="text-xl font-medium mb-6">Allocation</h2>
-                  <div className="text-gray-400 text-center py-8">Loading allocation data...</div>
+            {/* Main Content Column - Performance Chart and below components */}
+            <div className="col-span-8 flex flex-col space-y-4">
+              {/* Performance Chart - Much wider now */}
+              <PerformanceChart width={1100} height={400} />
+              
+              {/* Bottom row - Allocation and Activity with equal heights */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="h-full">
+                  {isLoading ? (
+                    <div className="bg-black border border-gray-700 text-white p-6 rounded-lg h-full">
+                      <h2 className="text-xl font-medium mb-6">Allocation</h2>
+                      <div className="text-gray-400 text-center py-8">Loading allocation data...</div>
+                    </div>
+                  ) : hasError ? (
+                    <div className="bg-black border border-gray-700 text-white p-6 rounded-lg h-full">
+                      <h2 className="text-xl font-medium mb-6">Allocation</h2>
+                      <div className="text-red-400 text-center py-8">Error loading data</div>
+                    </div>
+                  ) : (
+                    <Allocation allocations={allocations} />
+                  )}
                 </div>
-              ) : hasError ? (
-                <div className="bg-[#1a1a1a] border border-[#333] text-white p-6 rounded-lg">
-                  <h2 className="text-xl font-medium mb-6">Allocation</h2>
-                  <div className="text-red-400 text-center py-8">Error loading data</div>
+                
+                <div className="h-full">
+                  <ActivityGraphQL />
                 </div>
-              ) : (
-                <Allocation allocations={allocations} />
-              )}
+              </div>
             </div>
-            
-            {/* Right - Activity */}
-            <div className="col-span-3">
-              <ActivityGraphQL />
-            </div>
+
           </div>
         </div>
       </div>
 
       {/* Mobile Layout */}
       <div className="md:hidden px-4 pb-4 space-y-4">
-        {/* Vault Info Card */}
-        <PortfolioValue totalValue={totalValue} gains={totalGains} apy={currentApy} />
+        {/* Performance Chart Card */}
+        <PerformanceChart width={350} height={300} isMobile={true} />
         
         {/* Allocation Card */}
         {isLoading ? (
@@ -200,9 +193,10 @@ export default function Home() {
         {/* Wallet Connection */}
         <EthereumWalletConnection />
         
-        {/* Vault Actions */}
-        <VaultActions />
+        {/* Balance */}
+        <BalanceFigma />
       </div>
-    </div>
+      </div>
+    </TransactionStatusProvider>
   );
 }

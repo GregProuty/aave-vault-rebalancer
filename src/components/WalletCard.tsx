@@ -40,7 +40,7 @@ const WalletCard = ({
   };
 
   return (
-    <div className="bg-[#1a1a1a] border border-[#333] text-white rounded-lg w-full max-w-sm mx-auto overflow-hidden">
+    <div className="bg-black border border-gray-700 text-white rounded-lg w-full max-w-sm mx-auto overflow-hidden">
       {/* Header */}
       <div className="flex justify-between items-center p-4 pb-2">
         <h2 className="text-lg font-medium">{truncateAddress(walletAddress)}</h2>
@@ -78,7 +78,7 @@ const WalletCard = ({
       <div className="flex gap-3 p-4 pt-2">
         <button 
           onClick={onWithdraw}
-          className="flex-1 bg-transparent border border-[#333] text-white py-3 px-6 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+          className="flex-1 bg-transparent border border-gray-700 text-white py-3 px-6 rounded-lg font-medium hover:bg-gray-800 transition-colors"
         >
           Withdraw
         </button>
