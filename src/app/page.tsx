@@ -34,12 +34,12 @@ export default function Home() {
 
   const { allocations, isLoading: allocationsLoading, error: allocationsError } = useAllocationData();
   const { 
-    loading: performanceLoading, 
-    error: performanceError
+    loading: performanceLoading
   } = usePerformanceData();
   
   const isLoading = allocationsLoading || performanceLoading;
-  const hasError = allocationsError || performanceError;
+  // Only show allocation error if there's a specific allocation error, not performance errors
+  const hasAllocationError = allocationsError;
 
   const handleWelcomeClose = () => {
     setShowWelcome(false);
@@ -147,7 +147,7 @@ export default function Home() {
                       <h2 className="text-xl font-medium mb-6">Allocation</h2>
                       <div className="text-gray-400 text-center py-8">Loading allocation data...</div>
                     </div>
-                  ) : hasError ? (
+                  ) : hasAllocationError ? (
                     <div className="bg-black border border-gray-700 text-white p-6 rounded-lg h-full">
                       <h2 className="text-xl font-medium mb-6">Allocation</h2>
                       <div className="text-red-400 text-center py-8">Error loading data</div>
@@ -178,7 +178,7 @@ export default function Home() {
             <h2 className="text-xl font-medium mb-6">Allocation</h2>
             <div className="text-gray-400 text-center py-8">Loading allocation data...</div>
           </div>
-        ) : hasError ? (
+        ) : hasAllocationError ? (
           <div className="bg-[#1a1a1a] border border-[#333] text-white p-6 rounded-lg">
             <h2 className="text-xl font-medium mb-6">Allocation</h2>
             <div className="text-red-400 text-center py-8">Error loading data</div>
