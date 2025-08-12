@@ -34,6 +34,7 @@ export interface ActivityEntry {
   transactionHash?: string;
   timestamp: string;
   icon: string;
+  timeAgo?: string;
 }
 
 interface UseActivityDataReturn {
@@ -75,10 +76,10 @@ export function useActivityData(limit: number = 20): UseActivityDataReturn {
   const getRecentTransactionActivities = (): ActivityEntry[] => {
     return messages
       .filter(msg => msg.type === 'success' && msg.txHash)
-      .map((msg, index) => {
-        const isDeposit = msg.message.toLowerCase().includes('deposit');
-        const isWithdraw = msg.message.toLowerCase().includes('withdraw');
-        const isApproval = msg.message.toLowerCase().includes('approval');
+      .map((msg) => {
+        const messageText = msg.message.toLowerCase();
+        const isWithdraw = messageText.includes('withdraw');
+        const isApproval = messageText.includes('approval');
         
         // Skip approval messages as they're not user-facing activities
         if (isApproval) return null;
@@ -89,7 +90,7 @@ export function useActivityData(limit: number = 20): UseActivityDataReturn {
         
         let type: ActivityEntry['type'] = 'DEPOSIT';
         let icon = '/deposit.svg';
-        let title = msg.message;
+        const title = msg.message;
         
         if (isWithdraw) {
           type = 'WITHDRAWAL';
@@ -113,7 +114,8 @@ export function useActivityData(limit: number = 20): UseActivityDataReturn {
   useEffect(() => {
     if (data?.recentActivity) {
       // Combine backend data with recent transaction status messages
-      const backendActivities = data.recentActivity.map((activity: any) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const backendActivities: ActivityEntry[] = data.recentActivity.map((activity: any) => ({
         ...activity,
         timeAgo: formatTimestamp(activity.timestamp)
       }));
@@ -155,7 +157,7 @@ export function useActivityData(limit: number = 20): UseActivityDataReturn {
 export const getMockActivityData = (): ActivityEntry[] => [
   {
     id: 'mock_1',
-    type: 'REBALANCE',
+    type: 'REBALANCE' as const,
     title: 'Rebalanced 10% from Base to Ethereum',
     description: 'Automated rebalancing for optimal yield',
     amount: 500000,
@@ -165,7 +167,7 @@ export const getMockActivityData = (): ActivityEntry[] => [
   },
   {
     id: 'mock_2',
-    type: 'DEPOSIT',
+    type: 'DEPOSIT' as const,
     title: 'Received deposit of $1,230',
     description: 'from 0x345...',
     amount: 1230,
@@ -175,7 +177,7 @@ export const getMockActivityData = (): ActivityEntry[] => [
   },
   {
     id: 'mock_3',
-    type: 'HARVEST',
+    type: 'HARVEST' as const,
     title: 'Harvested $527 yield',
     description: 'Automatic yield collection',
     amount: 527,
@@ -184,7 +186,7 @@ export const getMockActivityData = (): ActivityEntry[] => [
   },
   {
     id: 'mock_4',
-    type: 'WITHDRAWAL',
+    type: 'WITHDRAWAL' as const,
     title: 'Withdrawal of $820 initiated',
     description: 'by 0x456...',
     amount: 820,
@@ -194,7 +196,7 @@ export const getMockActivityData = (): ActivityEntry[] => [
   },
   {
     id: 'mock_5',
-    type: 'ALLOCATION',
+    type: 'ALLOCATION' as const,
     title: 'Allocated 40% to Ethereum',
     description: 'Strategy adjustment',
     timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),

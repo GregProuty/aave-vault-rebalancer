@@ -33,7 +33,7 @@ export const BalanceFigma = () => {
   
   // Read user's USDC balance
   const { data: usdcBalance, refetch: refetchUSDCBalance } = useReadContract({
-    address: chainId ? getUSDCAddress(chainId) : undefined,
+    address: chainId ? getUSDCAddress(chainId) as `0x${string}` : undefined,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
@@ -42,10 +42,10 @@ export const BalanceFigma = () => {
 
   // Read current USDC allowance for the vault
   const { data: usdcAllowance, refetch: refetchAllowance } = useReadContract({
-    address: chainId ? getUSDCAddress(chainId) : undefined,
+    address: chainId ? getUSDCAddress(chainId) as `0x${string}` : undefined,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: address && chainId ? [address, getContractAddress(chainId)] : undefined,
+    args: address && chainId ? [address, getContractAddress(chainId) as `0x${string}`] : undefined,
     query: { enabled: !!address && !!chainId }
   });
   
@@ -61,30 +61,27 @@ export const BalanceFigma = () => {
 
 
   // Read vault total assets and total supply for share price calculation
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { data: totalAssets, refetch: refetchTotalAssets } = useReadContract({
-    address: chainId ? getContractAddress(chainId) : undefined,
+    address: chainId ? getContractAddress(chainId) as `0x${string}` : undefined,
     abi: AAVE_VAULT_ABI,
     functionName: 'totalAssets',
     query: { enabled: !!chainId }
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { data: totalSupply, refetch: refetchTotalSupply } = useReadContract({
-    address: chainId ? getContractAddress(chainId) : undefined,
+    address: chainId ? getContractAddress(chainId) as `0x${string}` : undefined,
     abi: AAVE_VAULT_ABI,
     functionName: 'totalSupply',
     query: { enabled: !!chainId }
   });
 
   // Calculate user's balance in USDC
-  const userBalance = vaultShares && totalAssets && totalSupply && totalSupply > 0n
-    ? (parseFloat(formatUnits(vaultShares, 18)) * parseFloat(formatUnits(totalAssets, 6))) / parseFloat(formatUnits(totalSupply, 18))
-    : 0;
+  // Note: userBalance calculation removed as it's not currently used in the UI
 
   // Format values for display
-  const balanceFormatted = userBalance > 0 ? userBalance.toLocaleString(undefined, { 
-    minimumFractionDigits: 0, 
-    maximumFractionDigits: 0 
-  }) : '0';
+  // Note: balanceFormatted removed as it's not currently used in the UI
   
   const vaultSharesFormatted = vaultShares 
     ? parseFloat(formatUnits(vaultShares, 6)).toFixed(4)
@@ -129,7 +126,8 @@ export const BalanceFigma = () => {
       // Get the provider from the connected wallet (RainbowKit/Wagmi)
       const provider = await connector.getProvider();
       
-      if (!provider || !provider.request) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!provider || !(provider as any).request) {
         addMessage({
           type: 'error',
           message: 'Wallet provider not available.',
@@ -153,7 +151,8 @@ export const BalanceFigma = () => {
         'Network': chainId === 84532 ? 'Base Sepolia' : chainId
       });
       
-      const wasAdded = await provider.request({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wasAdded = await (provider as any).request({
         method: 'wallet_watchAsset',
         params: {
           type: 'ERC20',
@@ -178,9 +177,11 @@ export const BalanceFigma = () => {
       console.error('Failed to add token to wallet:', error);
       
       // Provide more specific error messages
-      if (error.code === 4001) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((error as any).code === 4001) {
         console.log('User rejected the request');
-      } else if (error.code === -32602) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } else if ((error as any).code === -32602) {
         addMessage({
           type: 'error',
           message: 'Wallet does not support adding custom tokens.',
@@ -268,28 +269,34 @@ export const BalanceFigma = () => {
       const maxAmount = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
       
       await writeUSDC({
-        address: getUSDCAddress(chainId),
+        address: getUSDCAddress(chainId) as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [getContractAddress(chainId), maxAmount],
+        args: [getContractAddress(chainId) as `0x${string}`, maxAmount],
       });
       
       // Transaction submitted successfully - the useEffect will handle the rest
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Approval failed:', error);
       setDepositStep('error');
       
       // Handle different error types
-      if (error?.message?.includes('User rejected') || 
-          error?.message?.includes('rejected') || 
-          error?.message?.includes('denied') ||
-          error?.name === 'UserRejectedRequestError') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((error as any)?.message?.includes('User rejected') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any 
+                    (error as any)?.message?.includes('rejected') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (error as any)?.message?.includes('denied') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (error as any)?.name === 'UserRejectedRequestError') {
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
-      } else if (error?.message?.includes('insufficient funds')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } else if ((error as any)?.message?.includes('insufficient funds')) {
         setErrorMessage('Insufficient funds for gas fee.');
       } else {
-        setErrorMessage(`Approval failed: ${error?.message || 'Please check your wallet and try again.'}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setErrorMessage(`Approval failed: ${(error as any)?.message || 'Please check your wallet and try again.'}`);
       }
     }
   };
@@ -304,7 +311,7 @@ export const BalanceFigma = () => {
       const amountInWei = parseUnits(depositAmount, 6);
       
       await writeVault({
-        address: getContractAddress(chainId),
+        address: getContractAddress(chainId) as `0x${string}`,
         abi: AAVE_VAULT_ABI,
         functionName: 'deposit',
         args: [amountInWei, address],
@@ -312,20 +319,26 @@ export const BalanceFigma = () => {
       
       // Transaction submitted successfully - the useEffect will handle the rest
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Deposit failed:', error);
       setDepositStep('error');
       
       // Handle different error types
-      if (error?.message?.includes('User rejected') || 
-          error?.message?.includes('rejected') || 
-          error?.message?.includes('denied') ||
-          error?.name === 'UserRejectedRequestError') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((error as any)?.message?.includes('User rejected') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any 
+                    (error as any)?.message?.includes('rejected') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (error as any)?.message?.includes('denied') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (error as any)?.name === 'UserRejectedRequestError') {
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
-      } else if (error?.message?.includes('insufficient funds')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } else if ((error as any)?.message?.includes('insufficient funds')) {
         setErrorMessage('Insufficient USDC balance or gas fee.');
       } else {
-        setErrorMessage(`Deposit failed: ${error?.message || 'Please check your wallet and try again.'}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setErrorMessage(`Deposit failed: ${(error as any)?.message || 'Please check your wallet and try again.'}`);
       }
     }
   };
@@ -365,7 +378,7 @@ export const BalanceFigma = () => {
         chainId
       });
       // Refresh all balances immediately after successful withdrawal
-      refreshAllBalances();
+        refreshAllBalances();
       // Stay on confirmation screen until user clicks "Done"
     }
     
@@ -396,7 +409,7 @@ export const BalanceFigma = () => {
       if (usdcWriteError.message?.includes('User rejected') || 
           usdcWriteError.message?.includes('rejected') || 
           usdcWriteError.message?.includes('denied') ||
-          usdcWriteError.name === 'UserRejectedRequestError') {
+          usdcWriteError.message?.includes('UserRejectedRequestError')) {
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
       } else {
         setErrorMessage(`Approval failed: ${usdcWriteError.message || 'Please try again.'}`);
@@ -408,7 +421,7 @@ export const BalanceFigma = () => {
       if (vaultWriteError.message?.includes('User rejected') || 
           vaultWriteError.message?.includes('rejected') || 
           vaultWriteError.message?.includes('denied') ||
-          vaultWriteError.name === 'UserRejectedRequestError') {
+          vaultWriteError.message?.includes('UserRejectedRequestError')) {
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
       } else {
         setErrorMessage(`Deposit failed: ${vaultWriteError.message || 'Please try again.'}`);
@@ -420,7 +433,7 @@ export const BalanceFigma = () => {
       if (vaultWriteError.message?.includes('User rejected') || 
           vaultWriteError.message?.includes('rejected') || 
           vaultWriteError.message?.includes('denied') ||
-          vaultWriteError.name === 'UserRejectedRequestError') {
+          vaultWriteError.message?.includes('UserRejectedRequestError')) {
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
       } else {
         setErrorMessage(`Withdrawal failed: ${vaultWriteError.message || 'Please try again.'}`);
@@ -779,18 +792,23 @@ export const BalanceFigma = () => {
       console.log('📝 Withdrawal transaction submitted, waiting for confirmation...');
       // Transaction submitted successfully - the useEffect will handle the rest
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Withdrawal failed:', error);
       setWithdrawStep('error');
       
       // Handle different error types
-      if (error?.message?.includes('User rejected') || 
-          error?.message?.includes('rejected') || 
-          error?.message?.includes('denied') ||
-          error?.name === 'UserRejectedRequestError') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((error as any)?.message?.includes('User rejected') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any 
+                    (error as any)?.message?.includes('rejected') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (error as any)?.message?.includes('denied') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (error as any)?.name === 'UserRejectedRequestError') {
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
       } else {
-        setErrorMessage(`Withdrawal failed: ${error?.message || 'Please try again.'}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setErrorMessage(`Withdrawal failed: ${(error as any)?.message || 'Please try again.'}`);
       }
     }
   };
@@ -1009,21 +1027,21 @@ export const BalanceFigma = () => {
     // Error step - transaction failed or was rejected
     if (withdrawStep === 'error') {
       return (
-        <>
-          <h3 className="text-xl font-medium mb-6 text-white">Withdraw</h3>
+    <>
+      <h3 className="text-xl font-medium mb-6 text-white">Withdraw</h3>
           
-          <div className="text-center py-8">
+      <div className="text-center py-8">
             <div className="text-red-400 text-4xl mb-4">❌</div>
             <p className="text-white mb-2">Withdrawal Failed</p>
             <p className="text-gray-400 text-sm mb-4">{errorMessage}</p>
             
             <div className="grid grid-cols-2 gap-2">
-              <button 
-                onClick={handleCancel}
-                className="bg-gray-700 text-white py-2 px-4 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
-              >
-                Cancel
-              </button>
+        <button 
+          onClick={handleCancel}
+          className="bg-gray-700 text-white py-2 px-4 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
+        >
+          Cancel
+        </button>
               <button 
                 onClick={() => setWithdrawStep('input')}
                 className="bg-gray-800 text-white py-2 px-4 rounded font-medium hover:bg-gray-700 transition-colors text-sm"
@@ -1031,9 +1049,9 @@ export const BalanceFigma = () => {
                 Try Again
               </button>
             </div>
-          </div>
-        </>
-      );
+      </div>
+    </>
+  );
     }
 
     return null;
