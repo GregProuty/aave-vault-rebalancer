@@ -10,6 +10,18 @@ module.exports = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // Design tokens
+        baseBlack: '#000000',
+        baseWhite: '#FFFFFF',
+        successGreen: '#22C55E',
+        gray1: '#0D0D0D',
+        gray2: '#171717',
+        gray3: '#202020',
+        gray4: '#333333',
+        // Text tokens
+        primary: '#FFFFFF',
+        secondary: 'rgba(255,255,255,0.7)',
+        tertiary: 'rgba(255,255,255,0.55)'
       },
     },
   },

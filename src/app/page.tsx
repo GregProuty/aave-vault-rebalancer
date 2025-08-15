@@ -109,60 +109,60 @@ export default function Home() {
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden md:block p-6">
-        <div className="w-full max-w-7xl mx-auto">
-
-          {/* Main Layout - 2 columns for better width utilization */}
-          <div className="grid grid-cols-12 gap-6 h-full">
-            {/* Left Column - Increased height to accommodate all components */}
-            <div className="col-span-4 flex flex-col">
-              <div className="bg-black border border-gray-700 rounded-lg text-white h-[900px] flex flex-col">
-                {/* Status Section - Fixed height */}
-                <div className="p-6 flex-shrink-0">
-                  <StatusPanelFigma />
-                </div>
-                
-                {/* Balance Section - Flexible height, no scrolling */}
-                <div className="p-6 flex-1">
-                  <BalanceFigma />
-                </div>
-                
-                {/* Wallet Section - Fixed height anchored to bottom */}
-                <div className="p-6 flex-shrink-0">
-                  <EthereumWalletConnection />
-                </div>
-              </div>
+      <div className="hidden md:block">
+        {/* Fixed left sidebar */}
+        <div className="fixed left-0 top-0 h-screen w-[360px] bg-gray1 border-r border-gray3">
+          <div className="h-full flex flex-col text-white p-6">
+            {/* Status Section */}
+            <div className="flex-shrink-0">
+              <StatusPanelFigma />
             </div>
-            
-            {/* Main Content Column - Performance Chart and below components */}
-            <div className="col-span-8 flex flex-col space-y-4">
-              {/* Performance Chart - Much wider now */}
-              <PerformanceChart width={1100} height={400} />
-              
-              {/* Bottom row - Allocation and Activity with equal heights */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="h-full">
+            {/* Spacer pushes footer stack (actions + wallet) to bottom */}
+            <div className="flex-1" />
+            {/* Actions (Balance) above Wallet at the bottom */}
+            <div className="flex-shrink-0 mb-6">
+              <BalanceFigma />
+            </div>
+            <div className="pt-0 flex-shrink-0">
+              <EthereumWalletConnection />
+            </div>
+          </div>
+        </div>
+
+        {/* Main content area centered; left padding accounts for sidebar width */}
+        <div className="pl-[360px] overflow-hidden">
+          {/* Constrain and center the main stack */}
+          <div className="w-full max-w-5xl mx-auto px-6 py-6 min-h-screen flex flex-col justify-between">
+            <div className="flex flex-col space-y-4">
+              {/* Performance Chart - full element, no inner wrapper */}
+              <PerformanceChart width={900} height={360} />
+
+              {/* Bottom row - Allocation and Activity centered vertically without forcing page scroll */}
+              <div className="grid grid-cols-2 gap-4 overflow-x-hidden items-center">
+                <div className="h-full overflow-x-hidden">
                   {isLoading ? (
-                    <div className="bg-black border border-gray-700 text-white p-6 rounded-lg h-full">
+                    <div className="bg-gray1 border border-gray3 text-primary p-6 rounded-lg h-full">
                       <h2 className="text-xl font-medium mb-6">Allocation</h2>
-                      <div className="text-gray-400 text-center py-8">Loading allocation data...</div>
+                      <div className="text-secondary text-center py-8">Loading allocation data...</div>
                     </div>
                   ) : hasAllocationError ? (
-                    <div className="bg-black border border-gray-700 text-white p-6 rounded-lg h-full">
+                    <div className="bg-gray1 border border-gray3 text-primary p-6 rounded-lg h-full">
                       <h2 className="text-xl font-medium mb-6">Allocation</h2>
                       <div className="text-red-400 text-center py-8">Error loading data</div>
                     </div>
                   ) : (
-                    <Allocation allocations={allocations} />
+                    <div className="bg-gray1 border border-gray3 rounded-lg p-0 h-full overflow-x-hidden max-w-full">
+                      <Allocation allocations={allocations} />
+                    </div>
                   )}
                 </div>
-                
-                <div className="h-full">
-                  <ActivityGraphQL />
+                <div className="h-full overflow-x-hidden">
+                  <div className="bg-gray1 border border-gray3 rounded-lg p-0 h-full overflow-x-hidden">
+                    <ActivityGraphQL />
+                  </div>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>

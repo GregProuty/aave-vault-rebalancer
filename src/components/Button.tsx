@@ -17,10 +17,13 @@ export const Button: React.FC<ButtonProps> = ({
   const baseClasses = 'font-medium rounded transition-all duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variantClasses = {
-    primary: 'bg-white text-black border border-white hover:bg-gray-700 hover:text-white hover:border-white',
-    secondary: 'bg-gray-700 text-white hover:bg-gray-600',
-    ghost: 'bg-gray-800 text-white hover:bg-gray-700'
-  };
+    // Primary CTA per spec: baseWhite background, black text
+    primary: 'bg-baseWhite text-black border border-baseWhite hover:bg-gray4 hover:text-primary hover:border-gray4',
+    // Secondary CTA per spec: BG gray3, border gray4
+    secondary: 'bg-gray3 text-primary border border-gray4 hover:bg-gray4',
+    // Tertiary CTA per spec: BG gray2, border gray4
+    ghost: 'bg-gray2 text-primary border border-gray4 hover:bg-gray3'
+  } as const;
   
   const sizeClasses = {
     sm: 'py-2 px-3 text-sm',

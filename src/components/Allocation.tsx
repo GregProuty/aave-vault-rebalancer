@@ -44,16 +44,16 @@ const Allocation = ({ allocations }: AllocationProps) => {
   const displayAllocations = sortedAllocations;
   
   return (
-    <div className="bg-black border border-gray-700 text-white rounded-lg w-full h-full">
+    <div className="bg-gray1 border border-gray3 text-primary rounded-lg w-full h-full overflow-x-hidden max-w-full">
       {/* Desktop Layout */}
-      <div className="hidden md:flex flex-col p-6 max-w-md h-full overflow-hidden">
-        <h2 className="text-xl font-medium mb-6">Allocation</h2>
+      <div className="hidden md:flex flex-col p-6 w-full h-full overflow-hidden max-w-full">
+        <h2 className="text-lg font-semibold mb-6">Allocation</h2>
         
         {/* Always show allocation visual and details */}
         <>
           {/* Visual allocation bars - Figma style */}
           <div className="mb-6">
-            <div className="flex h-16 rounded-lg border border-gray-700 overflow-hidden">
+            <div className="flex h-16 rounded-lg border border-gray3 overflow-hidden">
               {displayAllocations.filter(item => item.allocation > 0).map((item, index) => (
                 <div
                   key={index}
@@ -69,7 +69,7 @@ const Allocation = ({ allocations }: AllocationProps) => {
           </div>
 
           {/* Allocation details list */}
-          <div className="space-y-4 flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="space-y-4 flex-1 overflow-y-hidden overflow-x-hidden">
             {displayAllocations.map((item, index) => (
               <div key={index} className="flex items-center justify-between min-w-0">
                 {/* Left side - Icon and name */}
@@ -82,23 +82,23 @@ const Allocation = ({ allocations }: AllocationProps) => {
                       height={32}
                     />
                   </div>
-                  <span className="text-white font-medium truncate">{item.name}</span>
+                  <span className="text-primary font-medium truncate">{item.name}</span>
                 </div>
                 
                 {/* Middle - APY */}
-                <div className="text-gray-400 text-sm mx-4 shrink-0">
+                <div className="text-secondary text-sm mx-4 shrink-0">
                   {item.apy}% APY
                 </div>
                 
                 {/* Right side - Progress bar and percentage */}
                 <div className="flex items-center space-x-3 w-36 shrink-0">
-                  <div className="flex-1 bg-gray-800 rounded-full h-1.5">
+                  <div className="flex-1 bg-gray2 rounded-full h-1.5">
                     <div 
                       className="bg-white rounded-full h-1.5 transition-all duration-300"
                       style={{ width: `${item.allocation}%` }}
                     />
                   </div>
-                  <span className="text-white text-sm font-medium w-12 text-right">
+                  <span className="text-primary text-sm font-medium w-12 text-right">
                     {item.allocation}%
                   </span>
                 </div>
@@ -110,7 +110,7 @@ const Allocation = ({ allocations }: AllocationProps) => {
       </div>
 
       {/* Mobile Layout */}
-      <div className="md:hidden p-4">
+      <div className="md:hidden p-4 overflow-x-hidden max-w-full">
         <h2 className="text-lg font-medium mb-4">Allocation</h2>
         
         {/* Visual allocation bars */}

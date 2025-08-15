@@ -17,8 +17,8 @@ const PerformanceChart = ({
   const { 
     vaultPerformanceData, 
     loading, 
-    totalValue, 
-    totalGains, 
+    totalVaultValue, 
+    vaultGains, 
     currentApy 
   } = usePerformanceData();
 
@@ -32,7 +32,7 @@ const PerformanceChart = ({
 
   // Check if we have data - show empty state only if no vault balance AND no chart data
   // If user has a balance but no chart data, show mock data instead of empty state
-  const hasNoData = (!totalValue || totalValue === 0);
+  const hasNoData = (!totalVaultValue || totalVaultValue === 0);
 
   // Generate realistic mock performance data
   const generateMockData = () => {
@@ -123,12 +123,13 @@ const PerformanceChart = ({
 
   // Chart dimensions with proper margins for labels and scales
   const chartMargin = isMobile 
-    ? { left: 15, right: 15, top: 15, bottom: 40 }
-    : { left: 30, right: 80, top: 20, bottom: 50 };
+    ? { left: 16, right: 44, top: 12, bottom: 52 }
+    : { left: 28, right: 72, top: 16, bottom: 64 };
   
   // Chart container calculations with proper padding
   const chartContainerWidth = width - 48; // Account for px-6 padding (24px each side)
-  const chartContainerHeight = height - 140; // Account for header space and bottom padding
+  const headerHeight = isMobile ? 96 : 104; // Title/legend block height
+  const chartContainerHeight = Math.max(180, height - headerHeight); // Ensure enough room so X labels are visible
   
   const chartWidth = chartContainerWidth - chartMargin.left - chartMargin.right;
   const chartHeight = chartContainerHeight - chartMargin.top - chartMargin.bottom;
@@ -248,25 +249,25 @@ const PerformanceChart = ({
 
   // Desktop rendering - Figma design
   return (
-    <div className="relative w-full bg-black border border-gray-700 rounded-lg overflow-hidden" style={{ height: height }}>
+    <div className="relative w-full bg-gray1 border border-gray3 rounded-lg overflow-visible" style={{ height: height }}>
       {/* Header section with title and metrics */}
-      <div className="flex justify-between items-start mb-6 px-6 pt-6">
+      <div className="flex justify-between items-start px-6 pt-6 pb-2">
         {/* Left side - Title and metrics */}
         <div>
-          <h2 className="text-white text-lg font-medium mb-2">Vault</h2>
+          <h2 className="text-primary text-lg font-semibold mb-2">Vault</h2>
           <div className="flex items-center space-x-2 mb-1">
             {/* USDC Logo */}
             <img src="/usdc-icon.svg" alt="USDC" className="w-8 h-8" />
             <div className="flex items-baseline space-x-2">
-              <span className="text-white text-3xl font-semibold">
-                {totalValue ? totalValue.toFixed(2) : '0'}
+              <span className="text-primary text-3xl font-semibold">
+                {totalVaultValue ? totalVaultValue.toFixed(2) : '0'}
               </span>
-              <span className={`text-sm ${totalGains && totalGains >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {totalGains ? (totalGains >= 0 ? '+' : '') + totalGains.toFixed(2) : '+0'}
+              <span className={`text-sm ${vaultGains && vaultGains >= 0 ? 'text-successGreen' : 'text-red-400'}`}>
+                {vaultGains ? (vaultGains >= 0 ? '+' : '') + vaultGains.toFixed(2) : '+0'}
               </span>
             </div>
           </div>
-          <span className="text-gray-400 text-sm">
+          <span className="text-secondary text-sm">
             {currentApy ? (currentApy * 100).toFixed(2) + '% APY' : '4.47% APY'}
           </span>
         </div>
@@ -320,7 +321,7 @@ const PerformanceChart = ({
             />
           </div>
         ) : (
-          <div className="px-6 pb-4">
+          <div className="px-6 pb-8">
             <svg width="100%" height={chartContainerHeight} viewBox={`0 0 ${chartContainerWidth} ${chartContainerHeight}`} style={{overflow: 'hidden'}}>
         {/* Y-axis grid lines */}
         {yAxisValues.map((value, i) => {
@@ -378,7 +379,7 @@ const PerformanceChart = ({
             <text
               key={`time-${index}`}
               x={timeLabel.x}
-              y={chartMargin.top + chartHeight + 20}
+              y={chartMargin.top + chartHeight + 28}
               fill="rgba(255, 255, 255, 0.8)"
               fontSize="12"
               textAnchor="middle"

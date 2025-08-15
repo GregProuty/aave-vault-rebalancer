@@ -17,8 +17,8 @@ export const BalanceFigma = () => {
   const [withdrawStep, setWithdrawStep] = useState<'input' | 'withdrawing' | 'confirming' | 'error'>('input');
   const [errorMessage, setErrorMessage] = useState('');
   
-  // Get performance data for real APY and accurate vault value
-  const { currentApy, totalValue } = usePerformanceData();
+  // Get performance data for APY, user's vault value, and totals
+  const { currentApy, totalValue: userVaultValue } = usePerformanceData();
   
   // Transaction status context
   const { addMessage } = useTransactionStatus();
@@ -88,8 +88,9 @@ export const BalanceFigma = () => {
     : '0.0000';
 
   // Format USDC balance for display
-  const usdcBalanceFormatted = usdcBalance 
-    ? parseFloat(formatUnits(usdcBalance, 6)).toFixed(2)
+  // Display user's deposited funds in the vault (not wallet balance)
+  const userDepositedFormatted = userVaultValue 
+    ? parseFloat(userVaultValue.toString()).toFixed(2)
     : '0.00';
 
 
@@ -446,13 +447,13 @@ export const BalanceFigma = () => {
     <>
       {/* Title inside the card */}
       <h3 className="text-xl font-medium mb-6 text-white">Balance</h3>
-      {/* Balance Section */}
+      {/* Balance Section - user's deposited funds in the vault */}
       <div className="mb-6">
         <div className="flex items-center space-x-3 mb-2">
           {/* USDC Icon */}
           <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
           
-          <div className="text-3xl font-semibold">{usdcBalanceFormatted}</div>
+          <div className="text-3xl font-semibold">{userDepositedFormatted}</div>
         </div>
         
         <div className="text-gray-400 text-sm">
@@ -769,7 +770,7 @@ export const BalanceFigma = () => {
   };
 
   // Calculate withdrawable amount using accurate performance data
-  const withdrawableAmount = totalValue; // Use accurate total from performance hook
+  const withdrawableAmount = userVaultValue; // User's deposited funds available
   
   const isWithdrawAmountValid = withdrawAmount && parseFloat(withdrawAmount) > 0;
   const hasEnoughWithdrawBalance = withdrawableAmount && parseFloat(withdrawAmount) <= withdrawableAmount;
@@ -1058,9 +1059,9 @@ export const BalanceFigma = () => {
   };
 
   return (
-    <div className="text-white w-full">
-      {/* Balance Card Container - lighter gray background */}
-      <div className="bg-gray-800 rounded-md p-6">
+    <div className="text-primary w-full">
+      {/* Balance Card Container - matches sidebar components spec */}
+      <div className="bg-gray2 border border-gray3 rounded-md p-6">
         {currentState === 'balance' && renderBalanceState()}
         {currentState === 'deposit' && renderDepositState()}
         {currentState === 'withdraw' && renderWithdrawState()}

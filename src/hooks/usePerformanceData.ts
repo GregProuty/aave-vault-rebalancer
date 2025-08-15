@@ -260,14 +260,24 @@ export function usePerformanceData() {
     sharePrice = latestPoint.vaultSharePrice;
   }
   
-  const totalValue = userShares * sharePrice; // User's personal vault value, not total vault assets
+  const userVaultValue = userShares * sharePrice; // User's personal vault value
   
-  const totalGains = latestPoint ? latestPoint.differential * userShares : 0; // Scale gains by user's shares
+  // Total vault value from backend or on-chain fallback
+  let totalVaultValue = 0;
+  if (vaultData && vaultData.totalAssets) {
+    totalVaultValue = parseFloat(vaultData.totalAssets);
+  } else if (contractTotalAssets) {
+    totalVaultValue = Number(formatUnits(contractTotalAssets as bigint, 6));
+  }
+  
+  // Gains
   const performance24h = vaultData ? vaultData.performance24h : 0;
+  const userGains = latestPoint ? latestPoint.differential * userShares : 0; // For user
+  const vaultGains = totalVaultValue * performance24h; // Daily vault gain approximation
 
   // Simplified logging for vault values
   if (userShares > 0) {
-    console.log('💰 Your vault value:', totalValue, 'USDC (', userShares, 'shares at', sharePrice, 'price)');
+    console.log('💰 Your vault value:', userVaultValue, 'USDC (', userShares, 'shares at', sharePrice, 'price)');
   }
 
   // Convert to old format for backward compatibility
@@ -322,8 +332,12 @@ export function usePerformanceData() {
     error,
     
     // Summary values
-    totalValue,
-    totalGains,
+    // User-centric values (backward compatible names)
+    totalValue: userVaultValue,
+    totalGains: userGains,
+    // Vault totals
+    totalVaultValue,
+    vaultGains,
     sharePrice,
     performance24h,
     currentApy: performance24h * 365, // Annualized from 24h performance
