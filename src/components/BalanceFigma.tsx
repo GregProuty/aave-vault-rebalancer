@@ -148,7 +148,7 @@ export const BalanceFigma = () => {
         'Contract Address': contractAddress,
         'Token Symbol': 'AAVE-RB',
         'Decimals': 6,
-        'Network': chainId === 84532 ? 'Base Sepolia' : chainId
+        'Network': chainId === 1 ? 'Ethereum' : chainId === 84532 ? 'Base Sepolia' : chainId
       });
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

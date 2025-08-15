@@ -36,19 +36,24 @@ const Allocation = ({ allocations }: AllocationProps) => {
     { name: "Ethereum Sepolia", icon: getChainIcon("Ethereum"), apy: 4.2, allocation: 100, color: "#627eea" },
   ];
   
-  const displayAllocations = allocations.length > 0 ? allocations : mockAllocations;
+  // Sort allocations by allocation percentage (highest to lowest)
+  const sortedAllocations = allocations.length > 0 ? 
+    [...allocations].sort((a, b) => b.allocation - a.allocation) : 
+    [...mockAllocations].sort((a, b) => b.allocation - a.allocation);
+  
+  const displayAllocations = sortedAllocations;
   
   return (
     <div className="bg-black border border-gray-700 text-white rounded-lg w-full h-full">
       {/* Desktop Layout */}
-      <div className="hidden md:flex flex-col p-6 max-w-md h-full">
+      <div className="hidden md:flex flex-col p-6 max-w-md h-full overflow-hidden">
         <h2 className="text-xl font-medium mb-6">Allocation</h2>
         
         {/* Always show allocation visual and details */}
         <>
           {/* Visual allocation bars - Figma style */}
           <div className="mb-6">
-            <div className="flex h-16 rounded-lg overflow-hidden border border-gray-700">
+            <div className="flex h-16 rounded-lg border border-gray-700 overflow-hidden">
               {displayAllocations.filter(item => item.allocation > 0).map((item, index) => (
                 <div
                   key={index}
@@ -64,11 +69,11 @@ const Allocation = ({ allocations }: AllocationProps) => {
           </div>
 
           {/* Allocation details list */}
-          <div className="space-y-4 flex-1 overflow-y-auto">
+          <div className="space-y-4 flex-1 overflow-y-auto overflow-x-hidden">
             {displayAllocations.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div key={index} className="flex items-center justify-between min-w-0">
                 {/* Left side - Icon and name */}
-                <div className="flex items-center space-x-3 flex-1">
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
                   <div className="w-10 h-10 flex items-center justify-center shrink-0">
                     <Image
                       src={item.icon}
@@ -77,23 +82,23 @@ const Allocation = ({ allocations }: AllocationProps) => {
                       height={32}
                     />
                   </div>
-                  <span className="text-white font-medium">{item.name}</span>
+                  <span className="text-white font-medium truncate">{item.name}</span>
                 </div>
                 
                 {/* Middle - APY */}
-                <div className="text-gray-400 text-sm mx-4">
+                <div className="text-gray-400 text-sm mx-4 shrink-0">
                   {item.apy}% APY
                 </div>
                 
                 {/* Right side - Progress bar and percentage */}
-                <div className="flex items-center space-x-3 w-32">
+                <div className="flex items-center space-x-3 w-36 shrink-0">
                   <div className="flex-1 bg-gray-800 rounded-full h-1.5">
                     <div 
                       className="bg-white rounded-full h-1.5 transition-all duration-300"
                       style={{ width: `${item.allocation}%` }}
                     />
                   </div>
-                  <span className="text-white text-sm font-medium w-8 text-right">
+                  <span className="text-white text-sm font-medium w-12 text-right">
                     {item.allocation}%
                   </span>
                 </div>
@@ -101,16 +106,7 @@ const Allocation = ({ allocations }: AllocationProps) => {
               ))}
             </div>
         </>
-        
-        {/* Data source indicator - only show if we have data */}
-        {allocations.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-gray-700">
-            <div className="flex items-center justify-center space-x-1 text-xs text-gray-500">
-              <span className="text-green-400">●</span>
-              <span>Live data from NEAR contract</span>
-            </div>
-          </div>
-        )}
+
       </div>
 
       {/* Mobile Layout */}

@@ -155,7 +155,10 @@ export const useAllocationData = () => {
           };
         });
         
-        setAllocations(fallbackAllocations);
+        // Sort fallback allocations by allocation percentage (highest to lowest)
+        const sortedFallbackAllocations = fallbackAllocations.sort((a, b) => b.allocation - a.allocation);
+        
+        setAllocations(sortedFallbackAllocations);
         setTotalValue(0);
 
       } catch (err) {
@@ -254,13 +257,16 @@ export const useAllocationData = () => {
           console.log(`🎯 ${chainName} (${chainId}): ${allocationPercent}% allocation`);
         });
 
+        // Sort allocations by allocation percentage (highest to lowest)
+        const sortedAllocations = formattedAllocations.sort((a, b) => b.allocation - a.allocation);
+        
         console.log('✅ Final allocation data:', {
           totalValue,
-          allocations: formattedAllocations
+          allocations: sortedAllocations
         });
 
         return {
-          allocations: formattedAllocations,
+          allocations: sortedAllocations,
           totalValue: Math.round(totalValue)
         };
       }
@@ -311,9 +317,12 @@ export const useAllocationData = () => {
             };
           });
 
+          // Sort allocations by allocation percentage (highest to lowest)
+          const sortedActivityAllocations = activityAllocations.sort((a, b) => b.allocation - a.allocation);
+          
           console.log('🎉 Using allocation data derived from activity logs!');
           return {
-            allocations: activityAllocations,
+            allocations: sortedActivityAllocations,
             totalValue: Math.round(totalValue) || 1450000
           };
         }

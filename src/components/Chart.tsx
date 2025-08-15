@@ -88,7 +88,7 @@ const Chart = ({
   }
 
   return (
-    <div className="w-full h-full border">
+    <div className="w-full h-full">
       <svg 
         width="100%" 
         height="100%" 

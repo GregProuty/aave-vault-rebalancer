@@ -1,6 +1,7 @@
 // Contract addresses for different networks
 export const CONTRACT_ADDRESSES = {
   localhost: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788',
+  ethereum: '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2', // AAVE V3 Pool on Ethereum mainnet
   baseSepolia: '0xa189176b780Db31024038aD1C8080f62d87d5aea', // AaveVault on Base Sepolia
   arbitrumSepolia: '0x858a8afff11bfccb61e69da87eba1ecccc34c640', // AaveVault on Arbitrum Sepolia (deployed by coworker)
   optimismSepolia: '', // To be deployed
@@ -9,6 +10,7 @@ export const CONTRACT_ADDRESSES = {
 // USDC contract addresses for different networks
 export const USDC_ADDRESSES = {
   localhost: '0x16f18Ee01365Ef23E0564dfB635215A5B4Eaa3c4', // MockUSDC for local testing
+  ethereum: '0xA0b86a33E6441E43941295AaE15D29a6E6e98959', // USDC on Ethereum mainnet  
   baseSepolia: '0x23a4e6740F7b658Ad5041D1720b16508a725d53d', // MockUSDC for Base Sepolia testing
   arbitrumSepolia: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', // Circle's official USDC on Arbitrum Sepolia testnet
   optimismSepolia: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7', // Circle's official USDC on Optimism Sepolia testnet
@@ -161,6 +163,8 @@ export const getContractAddress = (chainId: number): string => {
   switch (chainId) {
     case 31337: // localhost
       return CONTRACT_ADDRESSES.localhost;
+    case 1: // Ethereum mainnet
+      return CONTRACT_ADDRESSES.ethereum;
     case 84532: // Base Sepolia
       return CONTRACT_ADDRESSES.baseSepolia;
     case 421614: // Arbitrum Sepolia
@@ -174,7 +178,7 @@ export const getContractAddress = (chainId: number): string => {
       }
       return CONTRACT_ADDRESSES.optimismSepolia;
     default:
-      throw new Error(`Unsupported chain ID: ${chainId}. Supported networks: Base Sepolia (84532), Arbitrum Sepolia (421614), Optimism Sepolia (11155420), or Localhost (31337).`);
+      throw new Error(`Unsupported chain ID: ${chainId}. Supported networks: Ethereum (1), Base Sepolia (84532), Arbitrum Sepolia (421614), Optimism Sepolia (11155420), or Localhost (31337).`);
   }
 };
 
@@ -183,6 +187,8 @@ export const getUSDCAddress = (chainId: number): string => {
   switch (chainId) {
     case 31337: // localhost
       return USDC_ADDRESSES.localhost;
+    case 1: // Ethereum mainnet
+      return USDC_ADDRESSES.ethereum;
     case 84532: // Base Sepolia
       return USDC_ADDRESSES.baseSepolia;
     case 421614: // Arbitrum Sepolia
@@ -190,6 +196,6 @@ export const getUSDCAddress = (chainId: number): string => {
     case 11155420: // Optimism Sepolia
       return USDC_ADDRESSES.optimismSepolia;
     default:
-      throw new Error(`Unsupported chain ID: ${chainId}. Supported networks: Base Sepolia (84532), Arbitrum Sepolia (421614), Optimism Sepolia (11155420), or Localhost (31337).`);
+      throw new Error(`Unsupported chain ID: ${chainId}. Supported networks: Ethereum (1), Base Sepolia (84532), Arbitrum Sepolia (421614), Optimism Sepolia (11155420), or Localhost (31337).`);
   }
 }; 

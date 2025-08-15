@@ -32,7 +32,7 @@ const StatusPanelFigma = () => {
       <div className="flex items-center space-x-3 mb-4">
         {/* Yieldr Logo */}
         <img src="/logo.svg" alt="Yieldr" className="w-8 h-8" />
-        <h1 className="text-lg font-medium text-white">YIELDR</h1>
+        {/* <h1 className="text-lg font-medium text-white">YIELDR</h1> */}
       </div>
 
       {/* Status messages */}

@@ -83,7 +83,7 @@ export const VaultActions: React.FC = () => {
   const [mobileStep, setMobileStep] = useState<'input' | 'confirm' | 'progress' | 'success' | 'error'>('input');
 
   // Check if current chain is supported and validate
-  const isChainSupported = chainId === 84532 || chainId === 421614 || chainId === 11155420 || chainId === 111155111;
+  const isChainSupported = chainId === 1 || chainId === 84532 || chainId === 421614 || chainId === 11155420 || chainId === 111155111;
   
   // Validate chain on change
   useMemo(() => {
