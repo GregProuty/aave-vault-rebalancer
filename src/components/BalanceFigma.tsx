@@ -649,7 +649,7 @@ export const BalanceFigma = () => {
       // Calculate values for display using accurate performance data
       // Deposits = the amount just deposited by the user
       const justDeposited = depositAmount ? parseFloat(depositAmount) : 0;
-      const currentTotal = totalValue; // Use accurate total from performance hook
+      const currentTotal = userVaultValue || 0; // Use accurate user total from performance hook
       const previousAmount = Math.max(0, currentTotal - justDeposited);
 
       return (
@@ -819,7 +819,7 @@ export const BalanceFigma = () => {
     // For withdraw, estimate deposits based on vault shares and use accurate total
     const userVaultShares = vaultShares ? parseFloat(formatUnits(vaultShares, 18)) : 0;
     const currentDeposits = userVaultShares; // Best approximation we have for original deposits
-    const currentTotal = totalValue; // Use accurate total from performance hook
+    const currentTotal = userVaultValue || 0; // Use accurate user total from performance hook
     const totalYield = Math.max(0, currentTotal - currentDeposits); // Total yield in vault
     
     // Calculate yield specifically for the withdrawal amount
