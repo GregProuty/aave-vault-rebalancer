@@ -32,7 +32,7 @@ export const BalanceFigma = () => {
   const { isLoading: isUSDCTxLoading, isSuccess: isUSDCTxSuccess, isError: isUSDCTxError } = useWaitForTransactionReceipt({ hash: usdcTxHash });
   
   // Read user's USDC balance
-  const { data: usdcBalance, refetch: refetchUSDCBalance } = useReadContract({
+  const { refetch: refetchUSDCBalance } = useReadContract({
     address: chainId ? getUSDCAddress(chainId) as `0x${string}` : undefined,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
