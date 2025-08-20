@@ -28,7 +28,7 @@ export const BalanceFigma = () => {
   const { writeContract: writeUSDC, data: usdcTxHash, isPending: isUSDCPending, error: usdcWriteError } = useWriteContract();
   
   // Transaction receipt hooks
-  const { isLoading: _isVaultTxLoading, isSuccess: isVaultTxSuccess, isError: isVaultTxError } = useWaitForTransactionReceipt({ hash: vaultTxHash });
+  const { isSuccess: isVaultTxSuccess, isError: isVaultTxError } = useWaitForTransactionReceipt({ hash: vaultTxHash });
   const { isLoading: isUSDCTxLoading, isSuccess: isUSDCTxSuccess, isError: isUSDCTxError } = useWaitForTransactionReceipt({ hash: usdcTxHash });
   
   // Read user's USDC balance
