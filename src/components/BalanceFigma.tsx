@@ -28,8 +28,8 @@ export const BalanceFigma = () => {
   const { writeContract: writeUSDC, data: usdcTxHash, isPending: isUSDCPending, error: usdcWriteError } = useWriteContract();
   
   // Transaction receipt hooks
-  const { isSuccess: isVaultTxSuccess, isError: isVaultTxError } = useWaitForTransactionReceipt({ hash: vaultTxHash });
-  const { isLoading: isUSDCTxLoading, isSuccess: isUSDCTxSuccess, isError: isUSDCTxError } = useWaitForTransactionReceipt({ hash: usdcTxHash });
+  const { isSuccess: isVaultTxSuccess, isError: isVaultTxError } = useWaitForTransactionReceipt({ hash: vaultTxHash, chainId });
+  const { isLoading: isUSDCTxLoading, isSuccess: isUSDCTxSuccess, isError: isUSDCTxError } = useWaitForTransactionReceipt({ hash: usdcTxHash, chainId });
   
   // Read user's USDC balance
   const { refetch: refetchUSDCBalance } = useReadContract({
@@ -360,7 +360,7 @@ export const BalanceFigma = () => {
       // Also refetch allowance for future deposits
       refetchAllowance();
     }
-    if (isVaultTxSuccess && depositStep === 'depositing') {
+    if (isVaultTxSuccess && (depositStep === 'depositing' || depositStep === 'error')) {
       setDepositStep('confirming');
       removeMessage('deposit-pending');
       upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC completed successfully!`, txHash: vaultTxHash, chainId });
@@ -368,7 +368,7 @@ export const BalanceFigma = () => {
       refreshAllBalances();
       // Stay on confirmation screen until user clicks "Done"
     }
-    if (isVaultTxSuccess && withdrawStep === 'withdrawing') {
+    if (isVaultTxSuccess && (withdrawStep === 'withdrawing' || withdrawStep === 'error')) {
       setWithdrawStep('confirming');
       addMessage({
         type: 'success',
@@ -390,12 +390,12 @@ export const BalanceFigma = () => {
     }
     if (isVaultTxError && depositStep === 'depositing') {
       setDepositStep('error');
-      setErrorMessage('Deposit transaction failed. Please try again.');
+      setErrorMessage('Deposit transaction failed. If it succeeded in your wallet, this will update shortly.');
       upsertMessage('deposit-pending', { type: 'error', message: 'Deposit failed. Please try again.', txHash: vaultTxHash, chainId });
     }
     if (isVaultTxError && withdrawStep === 'withdrawing') {
       setWithdrawStep('error');
-      setErrorMessage('Withdrawal transaction failed. Please try again.');
+      setErrorMessage('Withdrawal transaction failed. If it succeeded in your wallet, this will update shortly.');
     }
 
     // Handle writeContract errors (including MetaMask rejections)

@@ -171,14 +171,14 @@ const ResponsiveVaultChart: React.FC<ResponsiveVaultChartProps> = ({
             </div>
             {showMockToggle && (
               <div className="mr-[-5px]">
-              <button
-                onClick={() => setLocalMock(prev => { const next = !prev; setUseMock(next); return next; })}
-                className={`text-xs border border-gray3 rounded-md px-2 py-1 h-7 self-start ${(localMock || globalMock) ? 'bg-gray3 text-primary' : 'bg-gray2 text-secondary hover:bg-gray1'}`}
-                aria-pressed={localMock || globalMock}
-                title="Toggle mock data"
-              >
-                {(localMock || globalMock) ? 'Mock: On' : 'Mock: Off'}
-              </button>
+                <button
+                  onClick={() => setLocalMock(prev => { const next = !prev; setUseMock(next); return next; })}
+                  className={`text-xs border border-gray3 rounded-md px-2 py-1 h-7 self-start ${(localMock || globalMock) ? 'bg-gray3 text-primary' : 'bg-gray2 text-secondary hover:bg-gray1'}`}
+                  aria-pressed={localMock || globalMock}
+                  title="Toggle mock data"
+                >
+                  {(localMock || globalMock) ? 'Mock: On' : 'Mock: Off'}
+                </button>
               </div>
             )}
           </div>
