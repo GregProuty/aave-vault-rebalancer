@@ -6,7 +6,7 @@ import Allocation from "@/components/Allocation";
 import StatusPanelFigma from "@/components/StatusPanelFigma";
 import { EthereumWalletConnection } from "@/components/EthereumWalletConnection";
 import { BalanceFigma } from "@/components/BalanceFigma";
-import PerformanceChart from "@/components/PerformanceChart";
+// import PerformanceChart from "@/components/PerformanceChart"; // kept for reference only
 import ResponsiveVaultChart from "@/components/ResponsiveVaultChart";
 import { useAllocationData } from "@/hooks/useAllocationData";
 import { usePerformanceData } from "@/hooks/usePerformanceData";

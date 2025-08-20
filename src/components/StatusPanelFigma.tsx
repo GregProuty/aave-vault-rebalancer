@@ -4,27 +4,9 @@ import React from 'react';
 import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
 
 const StatusPanelFigma = () => {
-  const { messages, removeMessage } = useTransactionStatus();
+  const { messages } = useTransactionStatus();
 
-  const getStatusIcon = (type: string) => {
-    switch (type) {
-      case 'success': return '✅';
-      case 'error': return '❌';
-      case 'pending': return '⏳';
-      case 'info': return 'ℹ️';
-      default: return '📋';
-    }
-  };
-
-  const getStatusColor = (type: string) => {
-    switch (type) {
-      case 'success': return 'text-green-400';
-      case 'error': return 'text-red-400';
-      case 'pending': return 'text-yellow-400';
-      case 'info': return 'text-blue-400';
-      default: return 'text-gray-300';
-    }
-  };
+  // Icon/color helpers not used in current design; remove to satisfy linter
 
   return (
     <div className="text-white w-full space-y-3">
