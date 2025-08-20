@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
 
 interface PerformanceChartProps {
@@ -21,6 +21,22 @@ const PerformanceChart = ({
     vaultGains, 
     currentApy 
   } = usePerformanceData();
+
+  // Measure container width to make the chart fill the card on mobile
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setContainerWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Prefer measured width; fall back to prop
+  const effectiveWidth = containerWidth || width;
 
   if (loading) {
     return (
@@ -127,9 +143,9 @@ const PerformanceChart = ({
     : { left: 28, right: 72, top: 16, bottom: 64 };
   
   // Chart container calculations with proper padding
-  const chartContainerWidth = width - 48; // Account for px-6 padding (24px each side)
+  const chartContainerWidth = effectiveWidth - 48; // Account for px-6 padding (24px each side)
   const headerHeight = isMobile ? 96 : 104; // Title/legend block height
-  const chartContainerHeight = Math.max(180, height - headerHeight); // Ensure enough room so X labels are visible
+  const chartContainerHeight = Math.max(180, height - headerHeight); // Ensure enough room for axes labels
   
   const chartWidth = chartContainerWidth - chartMargin.left - chartMargin.right;
   const chartHeight = chartContainerHeight - chartMargin.top - chartMargin.bottom;
@@ -171,95 +187,124 @@ const PerformanceChart = ({
   // Note: Using dateLabels length for data validation
   console.debug('Chart data points:', dateLabels.length);
 
-  // Mobile simplified rendering
+  // Mobile rendering -> now mirrors desktop structure and fills width
   if (isMobile) {
     return (
-      <div className="relative w-full bg-black rounded-lg p-4" style={{ height: height }}>
-        {hasNoData ? (
-          // Empty state for mobile
-          <div className="flex flex-col items-center justify-center h-full">
-            {/* Subtle background pattern - matching Figma design */}
-            <div className="absolute inset-0">
-              <svg width="100%" height="100%" className="w-full h-full" viewBox="0 0 896 113" preserveAspectRatio="xMidYMid slice">
-                <defs>
-                  <linearGradient id="mobilePaint0_linear" x1="448" y1="0" x2="448" y2="113" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="white"/>
-                    <stop offset="1" stopColor="white" stopOpacity="0"/>
-                  </linearGradient>
-                </defs>
-                
-                {/* Mobile version - single line pattern */}
-                <path d="M119.399 91.6118L89.6317 91.6567L59.7342 103.841L29.849 102.999L0 113H896V0L866.135 5.05339L836.27 5.10679L806.431 12.3688L776.593 30L746.632 25.2684L716.788 39.4435L686.927 34.9263L657.067 54.4088L627.17 33.1945L597.372 44.8649L562.926 48L537.628 55.6152L507.707 48.9325L477.86 58.4354L448.012 58.0279L418.165 48.5652L388.293 67.2166L358.396 57.6028L328.524 58.6172L298.666 72.8336L268.829 80.4147L238.836 79.5864L209.068 67.3506L179.728 79.8322L149.339 81.073L119.399 91.6118Z" fill="url(#mobilePaint0_linear)" fillOpacity="0.05"/>
-              </svg>
-            </div>
-            
-            {/* Empty state message */}
-            <div className="relative z-10 text-center">
-              <div className="text-gray-400 text-base font-medium mb-1">
-                No deposits yet...
-              </div>
-              <div className="text-gray-500 text-xs">
-                Make your first deposit
+      <div ref={containerRef} className="relative w-full bg-gray1 border border-gray3 rounded-lg overflow-hidden" style={{ height: height }}>
+        {/* Header section with title and metrics */}
+        <div className="flex justify-between items-start px-6 pt-4 pb-2">
+          <div>
+            <h2 className="text-primary text-base font-semibold mb-1 font-display">Vault</h2>
+            <div className="flex items-center space-x-2">
+              <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
+              <div className="flex items-baseline space-x-2">
+                <span className="text-primary text-2xl font-semibold font-display">
+                  {totalVaultValue ? totalVaultValue.toFixed(2) : '0'}
+                </span>
+                <span className={`text-xs ${vaultGains && vaultGains >= 0 ? 'text-successGreen' : 'text-red-400'}`}>
+                  {vaultGains ? (vaultGains >= 0 ? '+' : '') + vaultGains.toFixed(2) : '+0'}
+                </span>
               </div>
             </div>
+            <span className="text-secondary text-xs">
+              {currentApy ? (currentApy * 100).toFixed(2) + '% APY' : '4.47% APY'}
+            </span>
           </div>
-        ) : (
-        <svg width={width} height={height} className="absolute bottom-0 left-0">
-          {/* Simple gradient background */}
-          <defs>
-            <linearGradient id="mobileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgba(99, 102, 241, 0.3)" />
-              <stop offset="100%" stopColor="rgba(99, 102, 241, 0.1)" />
-            </linearGradient>
-          </defs>
-          
-          {/* Background area */}
-          <rect 
-            x={chartMargin.left} 
-            y={chartMargin.top} 
-            width={chartWidth} 
-            height={chartHeight}
-            fill="url(#mobileGradient)"
-            rx="4"
-          />
-          
-            {/* Real data rendering */}
+        </div>
+
+        {/* Chart container */}
+        <div className="px-4 pb-6">
+          <svg width="100%" height={chartContainerHeight} viewBox={`0 0 ${chartContainerWidth} ${chartContainerHeight}`} style={{ overflow: 'hidden' }}>
+            {/* Y-axis grid lines */}
+            {yAxisValues.map((value, i) => {
+              const y = chartMargin.top + (chartHeight * i / (yAxisValues.length - 1));
+              return (
+                <g key={`grid-m-${i}`}>
+                  <line
+                    x1={chartMargin.left}
+                    y1={y}
+                    x2={chartMargin.left + chartWidth}
+                    y2={y}
+                    stroke="rgba(255, 255, 255, 0.06)"
+                    strokeWidth="1"
+                    strokeDasharray="2,2"
+                  />
+                  <text
+                    x={chartMargin.left + chartWidth + 10}
+                    y={y + 4}
+                    fill="rgba(255, 255, 255, 0.8)"
+                    fontSize="10"
+                    textAnchor="start"
+                    fontFamily="system-ui, -apple-system"
+                    fontWeight="400"
+                  >
+                    {yAxisValues[yAxisValues.length - 1 - i].toFixed(1)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Y-axis line */}
+            <line
+              x1={chartMargin.left + chartWidth}
+              y1={chartMargin.top}
+              x2={chartMargin.left + chartWidth}
+              y2={chartMargin.top + chartHeight}
+              stroke="rgba(255, 255, 255, 0.15)"
+              strokeWidth="1"
+            />
+            {/* X-axis line */}
+            <line
+              x1={chartMargin.left}
+              y1={chartMargin.top + chartHeight}
+              x2={chartMargin.left + chartWidth}
+              y2={chartMargin.top + chartHeight}
+              stroke="rgba(255, 255, 255, 0.15)"
+              strokeWidth="1"
+            />
+
+            {/* X-axis time labels */}
+            {timeLabels.map((timeLabel, index) => (
+              <text
+                key={`time-m-${index}`}
+                x={timeLabel.x}
+                y={chartMargin.top + chartHeight + 22}
+                fill="rgba(255, 255, 255, 0.8)"
+                fontSize="10"
+                textAnchor="middle"
+                fontFamily="system-ui, -apple-system"
+                fontWeight="400"
+              >
+                {timeLabel.label}
+              </text>
+            ))}
+
+            {/* Performance lines */}
+            {baselinePath && (
+              <path d={baselinePath} fill="none" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1.25" strokeDasharray="4,4" />
+            )}
             {vaultPath && (
-                <path
-                  d={vaultPath}
-                  stroke="rgba(99, 102, 241, 1)"
-                  strokeWidth="2"
-                  fill="none"
-                />
-              )}
-              {baselinePath && (
-                <path
-                  d={baselinePath}
-                  stroke="rgba(255, 165, 0, 0.8)"
-                  strokeWidth="1.5"
-                  fill="none"
-                  strokeDasharray="4,4"
-                />
-              )}
+              <path d={vaultPath} fill="none" stroke="rgba(34, 197, 94, 1)" strokeWidth="2" />
+            )}
           </svg>
-        )}
+        </div>
       </div>
     );
   }
 
   // Desktop rendering - Figma design
   return (
-    <div className="relative w-full bg-gray1 border border-gray3 rounded-lg overflow-visible" style={{ height: height }}>
+    <div ref={containerRef} className="relative w-full bg-gray1 border border-gray3 rounded-lg overflow-hidden" style={{ height: height }}>
       {/* Header section with title and metrics */}
       <div className="flex justify-between items-start px-6 pt-6 pb-2">
         {/* Left side - Title and metrics */}
         <div>
-          <h2 className="text-primary text-lg font-semibold mb-2">Vault</h2>
+          <h2 className="text-primary text-lg font-semibold mb-2 font-display">Vault</h2>
           <div className="flex items-center space-x-2 mb-1">
             {/* USDC Logo */}
             <img src="/usdc-icon.svg" alt="USDC" className="w-8 h-8" />
             <div className="flex items-baseline space-x-2">
-              <span className="text-primary text-3xl font-semibold">
+              <span className="text-primary text-3xl font-semibold font-display">
                 {totalVaultValue ? totalVaultValue.toFixed(2) : '0'}
               </span>
               <span className={`text-sm ${vaultGains && vaultGains >= 0 ? 'text-successGreen' : 'text-red-400'}`}>
@@ -271,30 +316,22 @@ const PerformanceChart = ({
             {currentApy ? (currentApy * 100).toFixed(2) + '% APY' : '4.47% APY'}
           </span>
         </div>
-        
-                  {/* Right side - Legend */}
-          <div className="flex flex-row items-center space-x-6">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span className="text-white text-sm">Yieldr</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <svg width="12" height="12" className="flex-shrink-0">
-                <circle 
-                  cx="6" 
-                  cy="6" 
-                  r="5" 
-                  fill="transparent" 
-                  stroke="rgba(255, 255, 255, 0.5)" 
-                  strokeWidth="1.5"
-                  strokeDasharray="2,2"
-                />
-              </svg>
-              <span className="text-white text-sm">Aave</span>
-            </div>
+
+        {/* Right side - Legend */}
+        <div className="flex flex-row items-center space-x-6">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <span className="text-white text-sm">Yieldr</span>
           </div>
+          <div className="flex items-center space-x-2">
+            <svg width="12" height="12" className="flex-shrink-0">
+              <circle cx="6" cy="6" r="5" fill="transparent" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1.5" strokeDasharray="2,2" />
+            </svg>
+            <span className="text-white text-sm">Aave</span>
+          </div>
+        </div>
       </div>
-      
+
       {/* Chart container */}
       <div className="relative">
         {hasNoData ? (
@@ -302,188 +339,36 @@ const PerformanceChart = ({
           <div className="relative" style={{ height: height - 120 }}>
             {/* Empty state message - centered */}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-10 mt-[-10em]">
-                <div className="text-gray-400 text-base font-sm ">
-                  No deposits yet...
-                </div>
+              <div className="text-gray-400 text-base font-sm ">No deposits yet...</div>
             </div>
-
-            {/* Background graphic using CSS background approach */}
-            <div 
-              className="absolute left-2 right-2 bottom-2 z-0 pointer-events-none"
-              style={{
-                height: '280px',
-                backgroundImage: "url('/Graph container.svg')",
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'bottom center',
-                backgroundSize: '100% auto',
-                opacity: 0.6,
-              }}
-            />
           </div>
         ) : (
-          <div className="px-6 pb-8">
+          <div className="px-4 pb-6">
             <svg width="100%" height={chartContainerHeight} viewBox={`0 0 ${chartContainerWidth} ${chartContainerHeight}`} style={{overflow: 'hidden'}}>
-        {/* Y-axis grid lines */}
-        {yAxisValues.map((value, i) => {
-            const y = chartMargin.top + (chartHeight * i / (yAxisValues.length - 1));
-          return (
-            <g key={`grid-${i}`}>
-              {/* Horizontal grid line */}
-              <line
-                x1={chartMargin.left}
-                y1={y}
-                x2={chartMargin.left + chartWidth}
-                y2={y}
-                  stroke="rgba(255, 255, 255, 0.06)"
-                  strokeWidth="1"
-                  strokeDasharray="2,2"
-                />
-                                {/* Y-axis label - positioned in right margin */}
-                <text
-                  x={chartMargin.left + chartWidth + 15}
-                  y={y + 4}
-                  fill="rgba(255, 255, 255, 0.8)"
-                  fontSize="12"
-                  textAnchor="start"
-                  fontFamily="system-ui, -apple-system"
-                  fontWeight="400"
-                >
-                  {yAxisValues[yAxisValues.length - 1 - i].toFixed(1)}
-                </text>
-            </g>
-          );
-        })}
-        
-          {/* Y-axis line - positioned on right side */}
-        <line
-            x1={chartMargin.left + chartWidth}
-          y1={chartMargin.top}
-            x2={chartMargin.left + chartWidth}
-          y2={chartMargin.top + chartHeight}
-            stroke="rgba(255, 255, 255, 0.15)"
-          strokeWidth="1"
-        />
-        
-        {/* X-axis line */}
-        <line
-          x1={chartMargin.left}
-          y1={chartMargin.top + chartHeight}
-          x2={chartMargin.left + chartWidth}
-          y2={chartMargin.top + chartHeight}
-            stroke="rgba(255, 255, 255, 0.15)"
-          strokeWidth="1"
-        />
-        
-                  {/* X-axis time labels */}
-          {timeLabels.map((timeLabel, index) => (
-            <text
-              key={`time-${index}`}
-              x={timeLabel.x}
-              y={chartMargin.top + chartHeight + 28}
-              fill="rgba(255, 255, 255, 0.8)"
-              fontSize="12"
-              textAnchor="middle"
-              fontFamily="system-ui, -apple-system"
-              fontWeight="400"
-            >
-              {timeLabel.label}
-            </text>
-          ))}
-        
-        {/* Performance lines */}
-        {!hasNoData && (
-          <>
-              {/* Enhanced gradient definitions */}
-              <defs>
-                <linearGradient id="yieldrGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(34, 197, 94, 0.4)" />
-                  <stop offset="50%" stopColor="rgba(34, 197, 94, 0.2)" />
-                  <stop offset="100%" stopColor="rgba(34, 197, 94, 0.05)" />
-                </linearGradient>
-              </defs>
-              
-              {/* Old area fill removed - using new bounded area fill below */}
-              
+              {/* Y-axis grid lines */}
+              {yAxisValues.map((value, i) => {
+                const y = chartMargin.top + (chartHeight * i / (yAxisValues.length - 1));
+                return (
+                  <g key={`grid-${i}`}>
+                    <line x1={chartMargin.left} y1={y} x2={chartMargin.left + chartWidth} y2={y} stroke="rgba(255, 255, 255, 0.06)" strokeWidth="1" strokeDasharray="2,2" />
+                    <text x={chartMargin.left + chartWidth + 15} y={y + 4} fill="rgba(255, 255, 255, 0.8)" fontSize="12" textAnchor="start" fontFamily="system-ui, -apple-system" fontWeight="400">{yAxisValues[yAxisValues.length - 1 - i].toFixed(1)}</text>
+                  </g>
+                );
+              })}
 
+              {/* Y-axis line - positioned on right side */}
+              <line x1={chartMargin.left + chartWidth} y1={chartMargin.top} x2={chartMargin.left + chartWidth} y2={chartMargin.top + chartHeight} stroke="rgba(255, 255, 255, 0.15)" strokeWidth="1" />
+              {/* X-axis line */}
+              <line x1={chartMargin.left} y1={chartMargin.top + chartHeight} x2={chartMargin.left + chartWidth} y2={chartMargin.top + chartHeight} stroke="rgba(255, 255, 255, 0.15)" strokeWidth="1" />
 
+              {/* X-axis time labels */}
+              {timeLabels.map((timeLabel, index) => (
+                <text key={`time-${index}`} x={timeLabel.x} y={chartMargin.top + chartHeight + 26} fill="rgba(255, 255, 255, 0.8)" fontSize="12" textAnchor="middle" fontFamily="system-ui, -apple-system" fontWeight="400">{timeLabel.label}</text>
+              ))}
 
-
-            {/* Enhanced area fill with subtle green opacity and gray gradient below baseline */}
-            <defs>
-              {/* Green gradient above baseline - much more subtle */}
-              <linearGradient id="enhancedGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="rgba(34, 197, 94, 0.15)" />
-                <stop offset="40%" stopColor="rgba(34, 197, 94, 0.08)" />
-                <stop offset="80%" stopColor="rgba(34, 197, 94, 0.02)" />
-                <stop offset="95%" stopColor="rgba(34, 197, 94, 0.01)" />
-                <stop offset="100%" stopColor="rgba(0, 0, 0, 0.1)" />
-              </linearGradient>
-              
-              {/* Gray gradient below baseline */}
-              <linearGradient id="belowBaselineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.03)" />
-                <stop offset="50%" stopColor="rgba(255, 255, 255, 0.015)" />
-                <stop offset="100%" stopColor="rgba(0, 0, 0, 0.2)" />
-              </linearGradient>
-            </defs>
-            
-            {/* Area fill between Yieldr line and baseline only */}
-            {vaultValues.length > 0 && baselineValues.length > 0 && (
-              <path
-                d={`
-                  M ${chartMargin.left} ${chartMargin.top + (1 - (vaultValues[0] - minValue) / (maxValue - minValue)) * chartHeight}
-                  ${vaultValues.map((value, i) => {
-                    const x = chartMargin.left + (i / (vaultValues.length - 1)) * chartWidth;
-                    const y = chartMargin.top + (1 - (value - minValue) / (maxValue - minValue)) * chartHeight;
-                    return `L ${x} ${y}`;
-                  }).join(' ')}
-                  ${baselineValues.slice().reverse().map((value, i) => {
-                    const x = chartMargin.left + ((baselineValues.length - 1 - i) / (baselineValues.length - 1)) * chartWidth;
-                    const y = chartMargin.top + (1 - (value - minValue) / (maxValue - minValue)) * chartHeight;
-                    return `L ${x} ${y}`;
-                  }).join(' ')}
-                  Z
-                `}
-                fill="url(#enhancedGradient)"
-              />
-            )}
-
-            {/* Gray gradient area below baseline */}
-            {baselineValues.length > 0 && (
-              <path
-                d={`
-                  M ${chartMargin.left} ${chartMargin.top + (1 - (baselineValues[0] - minValue) / (maxValue - minValue)) * chartHeight}
-                  ${baselineValues.map((value, i) => {
-                    const x = chartMargin.left + (i / (baselineValues.length - 1)) * chartWidth;
-                    const y = chartMargin.top + (1 - (value - minValue) / (maxValue - minValue)) * chartHeight;
-                    return `L ${x} ${y}`;
-                  }).join(' ')}
-                  L ${chartMargin.left + chartWidth} ${chartMargin.top + chartHeight}
-                  L ${chartMargin.left} ${chartMargin.top + chartHeight}
-                  Z
-                `}
-                fill="url(#belowBaselineGradient)"
-              />
-            )}
-
-            {/* Baseline AAVE line - dotted */}
-            <path
-              d={baselinePath}
-              fill="none"
-              stroke="rgba(255, 255, 255, 0.5)"
-              strokeWidth="1.5"
-              strokeDasharray="4,4"
-            />
-            
-            {/* Vault performance line */}
-            <path
-              d={vaultPath}
-              fill="none"
-              stroke="rgba(34, 197, 94, 1)"
-              strokeWidth="2.5"
-            />
-          </>
-        )}
+              {/* Performance lines */}
+              {baselinePath && (<path d={baselinePath} fill="none" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1.5" strokeDasharray="4,4" />)}
+              {vaultPath && (<path d={vaultPath} fill="none" stroke="rgba(34, 197, 94, 1)" strokeWidth="2.5" />)}
             </svg>
           </div>
         )}

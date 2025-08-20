@@ -35,7 +35,7 @@ const ActivityGraphQL = () => {
     return (
       <div className="bg-gray1 border border-gray3 text-primary rounded-lg h-full overflow-hidden">
         <div className="p-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-primary">Activity</h2>
+          <h2 className="text-lg font-semibold text-primary font-display">Activity</h2>
           <div className="text-sm text-secondary flex items-center">
             <span>Rebalancing in {timeRemaining.hours}h {timeRemaining.minutes}m</span>
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-2"></div>
@@ -54,7 +54,7 @@ const ActivityGraphQL = () => {
       <div className="hidden md:flex flex-col h-full">
         {/* Header with countdown */}
         <div className="p-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-primary">Activity</h2>
+          <h2 className="text-lg font-semibold text-primary font-display">Activity</h2>
           <div className="text-sm text-secondary flex items-center">
             <span>Rebalancing in {timeRemaining.hours}h {timeRemaining.minutes}m</span>
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-2"></div>

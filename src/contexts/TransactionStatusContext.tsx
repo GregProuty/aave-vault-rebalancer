@@ -13,7 +13,8 @@ export interface StatusMessage {
 
 interface TransactionStatusContextType {
   messages: StatusMessage[];
-  addMessage: (message: Omit<StatusMessage, 'id' | 'timestamp'>) => void;
+  addMessage: (message: Omit<StatusMessage, 'id' | 'timestamp'>) => string;
+  upsertMessage: (key: string, message: Omit<StatusMessage, 'id' | 'timestamp'>) => void;
   removeMessage: (id: string) => void;
   clearMessages: () => void;
 }
@@ -54,6 +55,21 @@ export const TransactionStatusProvider: React.FC<TransactionStatusProviderProps>
         setMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
       }, 10000);
     }
+    return newMessage.id;
+  };
+
+  // Deterministic key upsert to handle persistent transaction messages
+  const upsertMessage = (key: string, messageData: Omit<StatusMessage, 'id' | 'timestamp'>) => {
+    setMessages(prev => {
+      const existingIndex = prev.findIndex(m => m.id === key);
+      const updated: StatusMessage = { ...messageData, id: key, timestamp: Date.now() };
+      if (existingIndex !== -1) {
+        const copy = [...prev];
+        copy[existingIndex] = updated;
+        return copy;
+      }
+      return [updated, ...prev].slice(0, 3);
+    });
   };
 
   const removeMessage = (id: string) => {
@@ -65,7 +81,7 @@ export const TransactionStatusProvider: React.FC<TransactionStatusProviderProps>
   };
 
   return (
-    <TransactionStatusContext.Provider value={{ messages, addMessage, removeMessage, clearMessages }}>
+    <TransactionStatusContext.Provider value={{ messages, addMessage, upsertMessage, removeMessage, clearMessages }}>
       {children}
     </TransactionStatusContext.Provider>
   );

@@ -37,40 +37,31 @@ const StatusPanelFigma = () => {
 
       {/* Status messages */}
       {messages.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {messages.map((message) => (
-            <div key={message.id} className="bg-gray-800 rounded-md p-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-2 flex-1">
-                  <span>{getStatusIcon(message.type)}</span>
-                  <span className={`text-sm ${getStatusColor(message.type)}`}>
-                    {message.message}
-                  </span>
-                </div>
-                {(message.type === 'success' || message.type === 'error') && (
-                  <button
-                    onClick={() => removeMessage(message.id)}
-                    className="text-gray-500 hover:text-gray-300 text-xs ml-2"
-                  >
-                    ×
-                  </button>
-                )}
+            <div key={message.id} className="bg-gray2 rounded-xl px-4 py-3">
+              <div className="flex items-center">
+                <span className="text-sm text-primary">
+                  {message.message}
+                </span>
               </div>
-              {message.txHash && (
-                <div className="mt-1 text-xs text-gray-500">
-                  Tx: {message.txHash.slice(0, 10)}...
-                </div>
-              )}
             </div>
           ))}
         </div>
       ) : (
-        <div className="bg-gray-800 rounded-md p-3">
-          <div className="flex items-center space-x-2">
-            <span>📊</span>
-            <span className="text-sm text-gray-300">
-              Ready for transactions
-            </span>
+        <div className="bg-gray2 border border-gray3 rounded-lg p-4">
+          <h2 className="text-white text-lg font-semibold mb-2 font-display">Welcome!</h2>
+          <p className="text-secondary text-sm leading-relaxed mb-4">
+            I am Yieldr, the first multichain agentic protocol that automatically maximizes your Aave earnings with unparalleled reliability.
+            Get started by approving a spending limit and depositing into the vault.
+          </p>
+          <div className="flex items-center gap-3">
+            <button className="px-4 py-2 rounded-lg border border-gray4 text-primary bg-transparent">
+              Help
+            </button>
+            <button className="px-4 py-2 rounded-lg bg-white text-black font-medium">
+              Get started
+            </button>
           </div>
         </div>
       )}

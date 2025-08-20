@@ -21,7 +21,7 @@ export const BalanceFigma = () => {
   const { currentApy, totalValue: userVaultValue } = usePerformanceData();
   
   // Transaction status context
-  const { addMessage } = useTransactionStatus();
+  const { addMessage, upsertMessage, removeMessage, clearMessages } = useTransactionStatus();
   
   // Contract write hooks
   const { writeContract: writeVault, data: vaultTxHash, isPending: isVaultPending, error: vaultWriteError } = useWriteContract();
@@ -266,6 +266,7 @@ export const BalanceFigma = () => {
     setDepositStep('approving');
     
     try {
+      upsertMessage('deposit-approving', { type: 'pending', message: 'Approving spending limit...' });
       // Approve maximum amount (type(uint256).max) for unlimited spending
       const maxAmount = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
       
@@ -274,6 +275,7 @@ export const BalanceFigma = () => {
         abi: ERC20_ABI,
         functionName: 'approve',
         args: [getContractAddress(chainId) as `0x${string}`, maxAmount],
+        chainId,
       });
       
       // Transaction submitted successfully - the useEffect will handle the rest
@@ -281,6 +283,7 @@ export const BalanceFigma = () => {
     } catch (error: unknown) {
       console.error('Approval failed:', error);
       setDepositStep('error');
+      removeMessage('deposit-approving');
       
       // Handle different error types
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -309,6 +312,8 @@ export const BalanceFigma = () => {
     setDepositStep('depositing');
     
     try {
+      removeMessage('deposit-approving');
+      upsertMessage('deposit-pending', { type: 'pending', message: 'Deposit in progress...' });
       const amountInWei = parseUnits(depositAmount, 6);
       
       await writeVault({
@@ -316,6 +321,7 @@ export const BalanceFigma = () => {
         abi: AAVE_VAULT_ABI,
         functionName: 'deposit',
         args: [amountInWei, address],
+        chainId,
       });
       
       // Transaction submitted successfully - the useEffect will handle the rest
@@ -323,6 +329,7 @@ export const BalanceFigma = () => {
     } catch (error: unknown) {
       console.error('Deposit failed:', error);
       setDepositStep('error');
+      removeMessage('deposit-pending');
       
       // Handle different error types
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -348,24 +355,15 @@ export const BalanceFigma = () => {
   useEffect(() => {
     if (isUSDCTxSuccess && depositStep === 'approving') {
       // Approval completed, now proceed with deposit
-      addMessage({
-        type: 'success',
-        message: 'USDC approval successful! Proceeding with deposit...',
-        txHash: usdcTxHash,
-        chainId
-      });
+      upsertMessage('deposit-approving', { type: 'success', message: 'Approval successful. Proceeding…', txHash: usdcTxHash, chainId });
       handleConfirmDeposit();
       // Also refetch allowance for future deposits
       refetchAllowance();
     }
     if (isVaultTxSuccess && depositStep === 'depositing') {
       setDepositStep('confirming');
-      addMessage({
-        type: 'success',
-        message: `Deposit of ${depositAmount} USDC completed successfully!`,
-        txHash: vaultTxHash,
-        chainId
-      });
+      removeMessage('deposit-pending');
+      upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC completed successfully!`, txHash: vaultTxHash, chainId });
       // Refresh all balances immediately after successful deposit
       refreshAllBalances();
       // Stay on confirmation screen until user clicks "Done"
@@ -388,16 +386,12 @@ export const BalanceFigma = () => {
       setDepositStep('error');
       const errorMsg = 'USDC approval transaction failed. Please try again.';
       setErrorMessage(errorMsg);
-      addMessage({
-        type: 'error',
-        message: errorMsg,
-        txHash: usdcTxHash,
-        chainId
-      });
+      upsertMessage('deposit-approving', { type: 'error', message: errorMsg, txHash: usdcTxHash, chainId });
     }
     if (isVaultTxError && depositStep === 'depositing') {
       setDepositStep('error');
       setErrorMessage('Deposit transaction failed. Please try again.');
+      upsertMessage('deposit-pending', { type: 'error', message: 'Deposit failed. Please try again.', txHash: vaultTxHash, chainId });
     }
     if (isVaultTxError && withdrawStep === 'withdrawing') {
       setWithdrawStep('error');
@@ -442,18 +436,34 @@ export const BalanceFigma = () => {
     }
   }, [isUSDCTxSuccess, isVaultTxSuccess, isUSDCTxError, isVaultTxError, usdcWriteError, vaultWriteError, depositStep, withdrawStep]);
 
+  // If user cancels in wallet, clear loading states gracefully
+  useEffect(() => {
+    if (usdcWriteError && depositStep === 'approving') {
+      setDepositStep('error');
+      setErrorMessage('Approval was cancelled in wallet.');
+    }
+    if (vaultWriteError && depositStep === 'depositing') {
+      setDepositStep('error');
+      setErrorMessage('Deposit was cancelled in wallet.');
+    }
+    if (vaultWriteError && withdrawStep === 'withdrawing') {
+      setWithdrawStep('error');
+      setErrorMessage('Withdrawal was cancelled in wallet.');
+    }
+  }, [usdcWriteError, vaultWriteError, depositStep, withdrawStep]);
+
   // Render different states based on currentState
   const renderBalanceState = () => (
     <>
       {/* Title inside the card */}
-      <h3 className="text-xl font-medium mb-6 text-white">Balance</h3>
+      <h3 className="text-lg font-semibold mb-6 text-white font-display">Balance</h3>
       {/* Balance Section - user's deposited funds in the vault */}
       <div className="mb-6">
         <div className="flex items-center space-x-3 mb-2">
           {/* USDC Icon */}
           <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
           
-          <div className="text-3xl font-semibold">{userDepositedFormatted}</div>
+          <div className="text-3xl font-semibold font-display">{userDepositedFormatted}</div>
         </div>
         
         <div className="text-gray-400 text-sm">
@@ -506,22 +516,18 @@ export const BalanceFigma = () => {
     if (depositStep === 'input') {
       return (
         <>
-          {/* Header with back button */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white">Deposit</h3>
-            <button 
-              onClick={handleCancel}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              ← Back
-            </button>
+            <h3 className="text-xl font-medium text-white font-display">Deposit</h3>
           </div>
           
           {/* Amount Input */}
           <div className="mb-4">
             <div className="relative">
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.]?[0-9]*"
                 placeholder="0"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
@@ -534,38 +540,43 @@ export const BalanceFigma = () => {
             </div>
           </div>
 
-          {/* Deposit Button - dynamic text based on allowance */}
-          <Button 
-            variant="primary"
-            onClick={handleInitiateDeposit}
-            disabled={!depositAmount || !isConnected}
-            className="w-full"
-          >
-            {depositAmount && hasEnoughAllowance(depositAmount) ? 'Deposit' : 'Approve & Deposit'}
-          </Button>
+          {/* Action Buttons - Cancel and Confirm */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="secondary"
+              onClick={handleCancel}
+              disabled={!isConnected}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="primary"
+              onClick={handleInitiateDeposit}
+              disabled={!depositAmount || !isConnected}
+              className="w-full"
+            >
+              {depositAmount && hasEnoughAllowance(depositAmount) ? 'Deposit' : 'Approve & Deposit'}
+            </Button>
+          </div>
         </>
       );
     }
 
     // Approving step - waiting for approval transaction
-    if (depositStep === 'approving' || isUSDCPending || isUSDCTxLoading) {
+    if (depositStep === 'approving') {
       return (
         <>
-          {/* Header with back button */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white">Deposit</h3>
-            <button 
-              onClick={handleCancel}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              ← Back
-            </button>
+            <h3 className="text-xl font-medium text-white font-display">Deposit</h3>
           </div>
           
           <div className="mb-4">
             <div className="relative">
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.]?[0-9]*"
                 value={depositAmount}
                 disabled
                 className="w-full bg-gray-700 text-white py-2 px-4 rounded border border-gray-600 pr-20 text-sm"
@@ -587,13 +598,11 @@ export const BalanceFigma = () => {
             <button 
               onClick={handleConfirmDeposit}
               disabled={isUSDCPending || isUSDCTxLoading}
-              className="bg-white text-black py-2 px-4 rounded font-medium hover:bg-gray-100 transition-colors text-sm disabled:opacity-50 flex items-center justify-center"
+              className={`${(isUSDCPending || isUSDCTxLoading) ? 'bg-gray3 text-white border border-gray4' : 'bg-white text-black hover:bg-gray-100'} h-12 px-4 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 flex items-center justify-center w-full`}
+              aria-busy={isUSDCPending || isUSDCTxLoading}
             >
-              {isUSDCPending || isUSDCTxLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-                  Approving...
-                </>
+              {(isUSDCPending || isUSDCTxLoading) ? (
+                <img src="/loader.svg" alt="Loading" className="w-5 h-5 animate-spin" />
               ) : (
                 'Confirm'
               )}
@@ -604,24 +613,20 @@ export const BalanceFigma = () => {
     }
 
     // Depositing step - waiting for deposit transaction
-    if (depositStep === 'depositing' || isVaultPending || isVaultTxLoading) {
+    if (depositStep === 'depositing') {
       return (
         <>
-          {/* Header with back button */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white">Deposit</h3>
-            <button 
-              onClick={handleCancel}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              ← Back
-            </button>
+            <h3 className="text-xl font-medium text-white font-display">Deposit</h3>
           </div>
           
           <div className="mb-4">
             <div className="relative">
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.]?[0-9]*"
                 value={depositAmount}
                 disabled
                 className="w-full bg-gray-700 text-white py-2 px-4 rounded border border-gray-600 pr-20 text-sm"
@@ -635,10 +640,10 @@ export const BalanceFigma = () => {
 
           <button 
             disabled
-            className="w-full bg-white text-black py-2 px-4 rounded font-medium text-sm opacity-50 cursor-not-allowed flex items-center justify-center"
+            className="w-full bg-gray3 text-white h-12 px-4 rounded-lg font-medium text-sm cursor-not-allowed flex items-center justify-center border border-gray4"
+            aria-busy="true"
           >
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-            Depositing...
+            <img src="/loader.svg" alt="Loading" className="w-5 h-5 animate-spin" />
           </button>
         </>
       );
@@ -656,7 +661,7 @@ export const BalanceFigma = () => {
         <>
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white">Deposit</h3>
+            <h3 className="text-xl font-medium text-white font-display">Deposit</h3>
           </div>
           
           {/* Summary Card */}
@@ -718,6 +723,7 @@ export const BalanceFigma = () => {
                 setCurrentState('balance');
                 setDepositStep('input');
                 setDepositAmount('');
+                clearMessages();
               }}
             >
               Done
@@ -731,15 +737,9 @@ export const BalanceFigma = () => {
     if (depositStep === 'error') {
       return (
         <>
-          {/* Header with back button */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white">Deposit</h3>
-            <button 
-              onClick={handleCancel}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              ← Back
-            </button>
+            <h3 className="text-xl font-medium text-white font-display">Deposit</h3>
           </div>
           
           <div className="text-center py-8">
@@ -787,7 +787,8 @@ export const BalanceFigma = () => {
         address: getContractAddress(chainId) as `0x${string}`,
         abi: AAVE_VAULT_ABI,
         functionName: 'withdraw',
-        args: [parseUnits(withdrawAmount, 6), address, address]
+        args: [parseUnits(withdrawAmount, 6), address, address],
+        chainId,
       });
       
       console.log('📝 Withdrawal transaction submitted, waiting for confirmation...');
@@ -817,10 +818,10 @@ export const BalanceFigma = () => {
   const renderWithdrawState = () => {
     // Calculate values for display - available across all steps using accurate performance data
     // For withdraw, estimate deposits based on vault shares and use accurate total
-    const userVaultShares = vaultShares ? parseFloat(formatUnits(vaultShares, 18)) : 0;
-    const currentDeposits = userVaultShares; // Best approximation we have for original deposits
-    const currentTotal = userVaultValue || 0; // Use accurate user total from performance hook
-    const totalYield = Math.max(0, currentTotal - currentDeposits); // Total yield in vault
+    const userVaultShares = vaultShares ? parseFloat(formatUnits(vaultShares, 6)) : 0; // shares decimals ~ underlying (USDC: 6)
+    const currentDeposits = userVaultShares; // assume initial sharePrice ~1
+    const currentTotal = userVaultValue || 0;
+    const totalYield = Math.max(0, currentTotal - currentDeposits);
     
     // Calculate yield specifically for the withdrawal amount
     const withdrawalAmount = withdrawAmount ? parseFloat(withdrawAmount) : 0;
@@ -839,7 +840,7 @@ export const BalanceFigma = () => {
         <>
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white">Withdraw</h3>
+            <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
           </div>
           
           {/* Summary Card */}
@@ -847,16 +848,16 @@ export const BalanceFigma = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-300 text-sm">Deposits</span>
-                <span className="text-white font-medium">{withdrawalAmount > 0 ? withdrawalDeposits.toFixed(2) : '0.00'} USDC</span>
+                <span className="text-white font-medium">{currentDeposits.toFixed(2)} USDC</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-300 text-sm">Yield</span>
-                <span className="text-green-400 font-medium">{withdrawalAmount > 0 ? withdrawalYield.toFixed(2) : '0.00'} USDC</span>
+                <span className="text-green-400 font-medium">{totalYield.toFixed(2)} USDC</span>
               </div>
               <div className="border-t border-gray-600 pt-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-300 text-sm">Total</span>
-                  <span className="text-white font-semibold">{withdrawalAmount > 0 ? withdrawalAmount.toFixed(2) : '0.00'} USDC</span>
+                  <span className="text-white font-semibold">{currentTotal.toFixed(2)} USDC</span>
                 </div>
               </div>
             </div>
@@ -866,7 +867,9 @@ export const BalanceFigma = () => {
           <div className="mb-4">
             <div className="relative">
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.]?[0-9]*"
                 placeholder="0"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
@@ -879,9 +882,7 @@ export const BalanceFigma = () => {
                 Max
               </button>
             </div>
-            <div className="mt-2 text-sm text-gray-400">
-              Available: ${withdrawableAmount.toFixed(2)} USDC
-            </div>
+            {/* Available line removed per design */}
           </div>
 
           {/* Action Buttons */}
@@ -912,12 +913,12 @@ export const BalanceFigma = () => {
     }
 
     // Withdrawing step - waiting for withdraw transaction
-    if (withdrawStep === 'withdrawing' || isVaultPending || isVaultTxLoading) {
+    if (withdrawStep === 'withdrawing') {
       return (
         <>
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white">Withdraw</h3>
+            <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
           </div>
           
           {/* Summary Card */}
@@ -940,9 +941,11 @@ export const BalanceFigma = () => {
             </div>
           </div>
 
-          {/* Processing indicator */}
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          {/* Processing indicator as spinner button */}
+          <div className="py-4">
+            <button disabled className="w-full bg-gray3 text-white h-12 px-4 rounded-lg font-medium text-sm cursor-not-allowed flex items-center justify-center border border-gray4" aria-busy="true">
+              <img src="/loader.svg" alt="Loading" className="w-5 h-5 animate-spin" />
+            </button>
           </div>
         </>
       );
@@ -954,7 +957,7 @@ export const BalanceFigma = () => {
         <>
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white">Withdraw</h3>
+            <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
           </div>
           
           {/* Summary Card */}
@@ -1016,6 +1019,7 @@ export const BalanceFigma = () => {
                 setCurrentState('balance');
                 setWithdrawStep('input');
                 setWithdrawAmount('');
+                clearMessages();
               }}
             >
               Done
@@ -1029,7 +1033,7 @@ export const BalanceFigma = () => {
     if (withdrawStep === 'error') {
       return (
     <>
-      <h3 className="text-xl font-medium mb-6 text-white">Withdraw</h3>
+      <h3 className="text-xl font-medium mb-6 text-white font-display">Withdraw</h3>
           
       <div className="text-center py-8">
             <div className="text-red-400 text-4xl mb-4">❌</div>
@@ -1061,11 +1065,18 @@ export const BalanceFigma = () => {
   return (
     <div className="text-primary w-full">
       {/* Balance Card Container - matches sidebar components spec */}
-      <div className="bg-gray2 border border-gray3 rounded-md p-6">
-        {currentState === 'balance' && renderBalanceState()}
-        {currentState === 'deposit' && renderDepositState()}
-        {currentState === 'withdraw' && renderWithdrawState()}
-      </div>
+      {(() => {
+        const isDepositBig = currentState === 'deposit' && (depositStep === 'confirming' || depositStep === 'error');
+        const isWithdrawBig = currentState === 'withdraw' && (withdrawStep === 'input' || withdrawStep === 'confirming' || withdrawStep === 'error');
+        const cardMinH = (isDepositBig || isWithdrawBig) ? 'min-h-80' : 'min-h-64';
+        return (
+          <div className={`bg-gray2 border border-gray3 rounded-md p-6 ${cardMinH}`}>
+            {currentState === 'balance' && renderBalanceState()}
+            {currentState === 'deposit' && renderDepositState()}
+            {currentState === 'withdraw' && renderWithdrawState()}
+          </div>
+        );
+      })()}
     </div>
   );
 };

@@ -47,7 +47,7 @@ const Allocation = ({ allocations }: AllocationProps) => {
     <div className="bg-gray1 border border-gray3 text-primary rounded-lg w-full h-full overflow-x-hidden max-w-full">
       {/* Desktop Layout */}
       <div className="hidden md:flex flex-col p-6 w-full h-full overflow-hidden max-w-full">
-        <h2 className="text-lg font-semibold mb-6">Allocation</h2>
+        <h2 className="text-lg font-semibold mb-6 font-display">Allocation</h2>
         
         {/* Always show allocation visual and details */}
         <>
@@ -111,7 +111,7 @@ const Allocation = ({ allocations }: AllocationProps) => {
 
       {/* Mobile Layout */}
       <div className="md:hidden p-4 overflow-x-hidden max-w-full">
-        <h2 className="text-lg font-medium mb-4">Allocation</h2>
+        <h2 className="text-lg font-medium mb-4 font-display">Allocation</h2>
         
         {/* Visual allocation bars */}
         <div className="mb-4">

@@ -7,6 +7,7 @@ import StatusPanelFigma from "@/components/StatusPanelFigma";
 import { EthereumWalletConnection } from "@/components/EthereumWalletConnection";
 import { BalanceFigma } from "@/components/BalanceFigma";
 import PerformanceChart from "@/components/PerformanceChart";
+import ResponsiveVaultChart from "@/components/ResponsiveVaultChart";
 import { useAllocationData } from "@/hooks/useAllocationData";
 import { usePerformanceData } from "@/hooks/usePerformanceData";
 import { TransactionStatusProvider } from "@/contexts/TransactionStatusContext";
@@ -15,6 +16,7 @@ import { TransactionStatusProvider } from "@/contexts/TransactionStatusContext";
 export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Check if device is mobile on mount and resize
   useEffect(() => {
@@ -50,21 +52,7 @@ export default function Home() {
   if (showWelcome && isMobile) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-white">
-        {/* Mobile Status Bar */}
-        <div className="flex justify-between items-center p-4 pt-12">
-          <div className="w-6 h-6">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-              <circle cx="5" cy="12" r="2"/>
-              <circle cx="12" cy="12" r="2"/>
-              <circle cx="19" cy="12" r="2"/>
-            </svg>
-          </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-4 h-1 bg-white rounded-full"></div>
-            <div className="w-4 h-1 bg-white rounded-full"></div>
-            <div className="w-4 h-1 bg-white rounded-full"></div>
-          </div>
-        </div>
+        {/* Mobile header removed per design */}
 
         {/* Welcome Content */}
         <div className="px-6 pt-8">
@@ -92,20 +80,18 @@ export default function Home() {
   return (
     <TransactionStatusProvider>
       <div className="min-h-screen bg-[#0a0a0a] text-white">
-      {/* Mobile Status Bar */}
+      {/* Mobile Header with logo (left) and hamburger (right) */}
       <div className="flex justify-between items-center p-4 pt-12 md:hidden">
-        <div className="w-6 h-6">
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-            <circle cx="5" cy="12" r="2"/>
-            <circle cx="12" cy="12" r="2"/>
-            <circle cx="19" cy="12" r="2"/>
+        <img src="/logo.svg" alt="Yieldr" className="w-8 h-8" />
+        <button
+          aria-label="Open menu"
+          className="p-2 rounded"
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+            <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-4 h-1 bg-white rounded-full"></div>
-          <div className="w-4 h-1 bg-white rounded-full"></div>
-          <div className="w-4 h-1 bg-white rounded-full"></div>
-        </div>
+        </button>
       </div>
 
       {/* Desktop Layout */}
@@ -132,10 +118,10 @@ export default function Home() {
         {/* Main content area centered; left padding accounts for sidebar width */}
         <div className="pl-[360px] overflow-hidden">
           {/* Constrain and center the main stack */}
-          <div className="w-full max-w-5xl mx-auto px-6 py-6 min-h-screen flex flex-col justify-between">
+          <div className="w-full max-w-[83.2rem] mx-auto px-6 py-6 min-h-screen flex flex-col justify-between">
             <div className="flex flex-col space-y-4">
-              {/* Performance Chart - full element, no inner wrapper */}
-              <PerformanceChart width={900} height={360} />
+              {/* New Responsive Chart */}
+              <ResponsiveVaultChart height={360} />
 
               {/* Bottom row - Allocation and Activity centered vertically without forcing page scroll */}
               <div className="grid grid-cols-2 gap-4 overflow-x-hidden items-center">
@@ -151,13 +137,13 @@ export default function Home() {
                       <div className="text-red-400 text-center py-8">Error loading data</div>
                     </div>
                   ) : (
-                    <div className="bg-gray1 border border-gray3 rounded-lg p-0 h-full overflow-x-hidden max-w-full">
+                    <div className="p-0 h-full overflow-x-hidden max-w-full">
                       <Allocation allocations={allocations} />
                     </div>
                   )}
                 </div>
                 <div className="h-full overflow-x-hidden">
-                  <div className="bg-gray1 border border-gray3 rounded-lg p-0 h-full overflow-x-hidden">
+                  <div className="p-0 h-full overflow-x-hidden">
                     <ActivityGraphQL />
                   </div>
                 </div>
@@ -169,8 +155,8 @@ export default function Home() {
 
       {/* Mobile Layout */}
       <div className="md:hidden px-4 pb-4 space-y-4">
-        {/* Performance Chart Card */}
-        <PerformanceChart width={350} height={300} isMobile={true} />
+        {/* Performance Chart Card (new responsive) */}
+        <ResponsiveVaultChart height={300} />
         
         {/* Allocation Card */}
         {isLoading ? (
@@ -190,11 +176,43 @@ export default function Home() {
         {/* Activity Card */}
         <ActivityGraphQL />
         
-        {/* Wallet Connection */}
-        <EthereumWalletConnection />
-        
         {/* Balance */}
         <BalanceFigma />
+      </div>
+      {/* Mobile slide-over menu with Wallet (animated) */}
+      <div
+        className={`md:hidden fixed inset-0 z-50 transition-opacity duration-200 motion-reduce:transition-none ${
+          mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        aria-hidden={!mobileMenuOpen}
+      >
+        {/* Backdrop */}
+        <div
+          className={`absolute inset-0 bg-black/50 transition-opacity duration-200 motion-reduce:transition-none ${
+            mobileMenuOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+        {/* Panel */}
+        <div
+          className={`absolute right-0 top-0 h-full w-80 bg-gray1 border-l border-gray3 p-4 overflow-y-auto transform transition-transform duration-200 ease-out will-change-transform motion-reduce:transition-none motion-reduce:transform-none ${
+            mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-white text-lg font-semibold">Menu</h2>
+            <button aria-label="Close menu" onClick={() => setMobileMenuOpen(false)} className="p-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+          <div className="space-y-4">
+            <EthereumWalletConnection />
+          </div>
+        </div>
       </div>
       </div>
     </TransactionStatusProvider>

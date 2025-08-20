@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Chakra_Petch, Inter } from "next/font/google";
 import "./globals.css";
 import ClientProviders from "@/components/ClientProviders";
 
+const chakra = Chakra_Petch({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
+
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["400"],
+  variable: "--font-body",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -20,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${chakra.variable} ${inter.variable} font-body antialiased`}>
         <ClientProviders>
           {children}
         </ClientProviders>

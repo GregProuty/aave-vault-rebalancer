@@ -23,6 +23,10 @@ module.exports = {
         secondary: 'rgba(255,255,255,0.7)',
         tertiary: 'rgba(255,255,255,0.55)'
       },
+      fontFamily: {
+        body: ["var(--font-body)", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Ubuntu", "Cantarell", "Noto Sans", "Helvetica Neue", "Arial", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-body)", "system-ui", "sans-serif"],
+      },
     },
   },
   plugins: [],
