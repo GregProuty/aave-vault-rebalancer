@@ -6,6 +6,7 @@ import { mainnet, sepolia, baseSepolia, localhost, arbitrumSepolia, optimismSepo
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { ApolloProvider } from '@apollo/client';
+import React, { createContext, useContext } from 'react';
 import { apolloClient } from '../lib/apollo-client';
 import '@rainbow-me/rainbowkit/styles.css';
 
@@ -29,6 +30,14 @@ interface ClientProvidersProps {
   children: React.ReactNode;
 }
 
+// Global mock toggle context
+const MockDataContext = createContext<{ useMock: boolean; setUseMock: (v: boolean) => void } | null>(null);
+export const useMockData = () => {
+  const ctx = useContext(MockDataContext);
+  if (!ctx) return { useMock: false, setUseMock: () => undefined };
+  return ctx;
+};
+
 export default function ClientProviders({ children }: ClientProvidersProps) {
   const [isClient, setIsClient] = useState(false);
   const [queryClient] = useState(() => new QueryClient({
@@ -39,6 +48,9 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
       },
     },
   }));
+
+  // Global mock toggle state must be declared before any conditional returns to preserve hook order
+  const [useMock, setUseMock] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -58,7 +70,9 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
       <QueryClientProvider client={queryClient}>
         <ApolloProvider client={apolloClient}>
           <RainbowKitProvider>
-            {children}
+            <MockDataContext.Provider value={{ useMock, setUseMock }}>
+              {children}
+            </MockDataContext.Provider>
           </RainbowKitProvider>
         </ApolloProvider>
       </QueryClientProvider>

@@ -4,10 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
 import { useActivityData, getMockActivityData } from '@/hooks/useActivityData';
 import Image from 'next/image';
+import { useMockData } from '@/components/ClientProviders';
 
 const ActivityGraphQL = () => {
   const { loading } = usePerformanceData();
   const { activities, loading: activitiesLoading, error: activitiesError } = useActivityData(15);
+  const { useMock } = useMockData();
   const [timeRemaining, setTimeRemaining] = useState({ hours: 1, minutes: 25 });
 
   // Update countdown every minute
@@ -26,10 +28,9 @@ const ActivityGraphQL = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Use real activity data or fallback to mock data
-  const displayActivities = activitiesError || activities.length === 0 
-    ? getMockActivityData() 
-    : activities;
+  // Decide which list to show based on global mock toggle
+  const displayActivities = useMock ? getMockActivityData() : activities;
+  const showEmpty = !useMock && !activitiesLoading && (!activities || activities.length === 0) && !activitiesError;
 
   if (loading) {
     return (
@@ -66,6 +67,10 @@ const ActivityGraphQL = () => {
           {activitiesLoading ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-secondary">Loading activity...</div>
+            </div>
+          ) : showEmpty ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-secondary">No recent activity</div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -124,6 +129,10 @@ const ActivityGraphQL = () => {
           {activitiesLoading ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-secondary">Loading activity...</div>
+            </div>
+          ) : showEmpty ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-secondary">No recent activity</div>
             </div>
           ) : (
             <div className="space-y-3 max-h-64 overflow-y-auto">

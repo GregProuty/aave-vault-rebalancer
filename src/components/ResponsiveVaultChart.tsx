@@ -2,6 +2,7 @@
 
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
+import { useMockData } from '@/components/ClientProviders';
 
 type XY = { x: number; y: number };
 
@@ -12,6 +13,7 @@ interface ResponsiveVaultChartProps {
   xLabels?: string[]; // Defaults: ['30D','20D','10D','Today']
   yTicks?: number[];  // Defaults: [1.0, 1.1, 1.2, 1.3]
   showHeader?: boolean;
+  showMockToggle?: boolean;
 }
 
 // New responsive chart purpose-built to keep bottom (X) and right (Y) scales perfectly centered
@@ -22,12 +24,15 @@ const ResponsiveVaultChart: React.FC<ResponsiveVaultChartProps> = ({
   xLabels = ['30D', '20D', '10D', 'Today'],
   yTicks = [1.0, 1.1, 1.2, 1.3],
   showHeader = true,
+  showMockToggle = true,
 }) => {
   const { vaultPerformanceData, loading, totalVaultValue, vaultGains, currentApy } = usePerformanceData();
 
   // Measure container width to be fully responsive
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [localMock, setLocalMock] = useState<boolean>(false);
+  const { useMock: globalMock, setUseMock } = useMockData();
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -57,26 +62,55 @@ const ResponsiveVaultChart: React.FC<ResponsiveVaultChartProps> = ({
   const maxValue = yTicks[yTicks.length - 1];
 
   const { vaultValues, baselineValues } = useMemo(() => {
-    if (vaultPerformanceData && vaultPerformanceData.length > 0) {
+    const generateMock = () => {
+      const days = 30; // 30D..Today -> 31 points
+
+      // Piecewise linear anchors (index, value). Tuned to mimic Figma's turns.
+      const yieldrAnchors: Array<[number, number]> = [
+        [0, 1.00], [3, 1.04], [6, 1.10], [8, 1.08], [12, 1.15], [15, 1.19],
+        [17, 1.18], [19, 1.21], [21, 1.20], [24, 1.24], [26, 1.26], [28, 1.29], [30, 1.30]
+      ];
+
+      const aaveAnchors: Array<[number, number]> = [
+        [0, 1.00], [4, 1.02], [7, 1.05], [9, 1.04], [13, 1.07], [16, 1.09],
+        [18, 1.085], [22, 1.10], [25, 1.105], [27, 1.11], [30, 1.13]
+      ];
+
+      const buildSeries = (anchors: Array<[number, number]>) => {
+        const out = new Array<number>(days + 1).fill(0);
+        for (let s = 0; s < anchors.length - 1; s++) {
+          const [i0, v0] = anchors[s];
+          const [i1, v1] = anchors[s + 1];
+          const span = Math.max(1, i1 - i0);
+          for (let i = 0; i < span; i++) {
+            const t = i / span;
+            // straight segments for angular look
+            const val = v0 + (v1 - v0) * t;
+            out[i0 + i] = Math.min(maxValue, Math.max(minValue, val));
+          }
+        }
+        const [lastIdx, lastVal] = anchors[anchors.length - 1];
+        out[lastIdx] = Math.min(maxValue, Math.max(minValue, lastVal));
+        for (let i = 1; i < out.length; i++) {
+          if (!out[i]) out[i] = out[i - 1];
+        }
+        return out;
+      };
+
+      const v = buildSeries(yieldrAnchors);
+      const b = buildSeries(aaveAnchors);
+      return { vaultValues: v, baselineValues: b };
+    };
+
+    const effectiveMock = localMock || globalMock;
+    if (!effectiveMock && vaultPerformanceData && vaultPerformanceData.length > 0) {
       return {
         vaultValues: vaultPerformanceData.map(p => p.vaultSharePrice),
         baselineValues: vaultPerformanceData.map(p => p.baselineValue),
       };
     }
-    // minimal deterministic mock to render shape
-    const days = 30;
-    const v: number[] = [];
-    const b: number[] = [];
-    let vv = 1.0;
-    let bb = 1.0;
-    for (let i = 0; i <= days; i++) {
-      vv = Math.min(maxValue, Math.max(minValue, vv * (1 + 0.006 + Math.sin(i * 0.23) * 0.004)));
-      bb = Math.min(maxValue, Math.max(minValue, bb * (1 + 0.0035 + Math.cos(i * 0.19) * 0.0025)));
-      v.push(vv);
-      b.push(bb);
-    }
-    return { vaultValues: v, baselineValues: b };
-  }, [vaultPerformanceData, minValue, maxValue]);
+    return generateMock();
+  }, [vaultPerformanceData, minValue, maxValue, localMock, globalMock]);
 
   const toPoint = (value: number, index: number, total: number): XY => {
     const x = margin.left + (chartWidth * (total === 1 ? 0 : index / (total - 1)));
@@ -121,6 +155,16 @@ const ResponsiveVaultChart: React.FC<ResponsiveVaultChartProps> = ({
             </div>
             <span className="text-secondary text-sm">{currentApy ? (currentApy * 100).toFixed(2) + '% APY' : '4.47% APY'}</span>
           </div>
+          {showMockToggle && (
+            <button
+              onClick={() => setLocalMock(prev => { const next = !prev; setUseMock(next); return next; })}
+              className={`text-xs border border-gray3 rounded-md px-2 py-1 h-7 self-start ${(localMock || globalMock) ? 'bg-gray3 text-primary' : 'bg-gray2 text-secondary hover:bg-gray1'}`}
+              aria-pressed={localMock || globalMock}
+              title="Toggle mock data"
+            >
+              {(localMock || globalMock) ? 'Mock: On' : 'Mock: Off'}
+            </button>
+          )}
         </div>
       )}
 

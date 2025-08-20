@@ -42,6 +42,8 @@ const Allocation = ({ allocations }: AllocationProps) => {
     [...mockAllocations].sort((a, b) => b.allocation - a.allocation);
   
   const displayAllocations = sortedAllocations;
+  const totalPercent = displayAllocations.reduce((sum, a) => sum + (a.allocation || 0), 0);
+  const remainingPercent = Math.max(0, 100 - totalPercent);
   
   return (
     <div className="bg-gray1 border border-gray3 text-primary rounded-lg w-full h-full overflow-x-hidden max-w-full">
@@ -51,20 +53,37 @@ const Allocation = ({ allocations }: AllocationProps) => {
         
         {/* Always show allocation visual and details */}
         <>
-          {/* Visual allocation bars - Figma style */}
+          {/* Visual allocation bars - segmented with gaps and reduced radius */}
           <div className="mb-6">
-            <div className="flex h-16 rounded-lg border border-gray3 overflow-hidden">
-              {displayAllocations.filter(item => item.allocation > 0).map((item, index) => (
+            <div className="flex h-16 rounded-lg gap-1 w-full">
+              {displayAllocations.filter(item => item.allocation > 0).map((item, index, arr) => (
                 <div
                   key={index}
-                  className="h-full relative"
-                  style={{ 
-                    width: `${item.allocation}%`, 
-                    backgroundColor: item.color,
-                    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(255,255,255,0.1) 3px, rgba(255,255,255,0.1) 6px)'
-                  }}
-                />
+                  className={`${index === 0 ? 'rounded-l-lg' : ''} ${index === arr.length - 1 ? 'rounded-r-lg' : ''} h-full relative`}
+                  style={{ flex: `0 0 ${item.allocation}%`, backgroundColor: item.color }}
+                >
+                  {/* Stripe overlay */}
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-15"
+                    style={{
+                      backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.35) 0px, rgba(255,255,255,0.35) 10px, rgba(255,255,255,0.0) 10px, rgba(255,255,255,0.0) 20px)',
+                      borderRadius: 'inherit'
+                    }}
+                  />
+                  {/* Light source + subtle inner shadow */}
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 35%, rgba(0,0,0,0) 70%), linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 40%)',
+                      boxShadow: 'inset 0 -6px 10px rgba(0,0,0,0.12)',
+                      borderRadius: 'inherit'
+                    }}
+                  />
+                </div>
               ))}
+              {remainingPercent > 0 && (
+                <div className="h-full rounded-r-lg" style={{ flex: `0 0 ${remainingPercent}%`, backgroundColor: '#0f0f10' }} />
+              )}
             </div>
           </div>
 
@@ -115,18 +134,35 @@ const Allocation = ({ allocations }: AllocationProps) => {
         
         {/* Visual allocation bars */}
         <div className="mb-4">
-          <div className="flex h-12 rounded-lg overflow-hidden">
-            {displayAllocations.map((item, index) => (
+          <div className="flex h-12 rounded-lg gap-1 w-full">
+            {displayAllocations.map((item, index, arr) => (
               <div
                 key={index}
-                className="h-full flex items-center justify-center"
-                style={{ 
-                  width: `${item.allocation}%`, 
-                  backgroundColor: item.color,
-                  backgroundImage: index < 3 ? 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)' : 'none'
-                }}
-              />
+                className={`${index === 0 ? 'rounded-l-lg' : ''} ${index === arr.length - 1 ? 'rounded-r-lg' : ''} h-full relative`}
+                style={{ flex: `0 0 ${item.allocation}%`, backgroundColor: item.color }}
+              >
+                {/* Stripe overlay */}
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-15"
+                  style={{
+                    backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.35) 0px, rgba(255,255,255,0.35) 8px, rgba(255,255,255,0.0) 8px, rgba(255,255,255,0.0) 16px)',
+                    borderRadius: 'inherit'
+                  }}
+                />
+                {/* Light source + subtle inner shadow */}
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 35%, rgba(0,0,0,0) 70%), linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 40%)',
+                    boxShadow: 'inset 0 -5px 8px rgba(0,0,0,0.12)',
+                    borderRadius: 'inherit'
+                  }}
+                />
+              </div>
             ))}
+            {remainingPercent > 0 && (
+              <div className="h-full rounded-r-lg" style={{ flex: `0 0 ${remainingPercent}%`, backgroundColor: '#0f0f10' }} />
+            )}
           </div>
         </div>
         

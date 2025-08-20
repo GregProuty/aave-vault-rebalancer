@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import { useMockData } from '@/components/ClientProviders';
 import { createNearContractReader, ChainAllocation } from '@/utils/nearContract';
 
 export interface AllocationItem {
@@ -121,6 +122,7 @@ export const useAllocationData = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isConnected, address } = useAccount();
+  const { useMock } = useMockData();
 
   useEffect(() => {
     const fetchAllocationData = async () => {
@@ -130,6 +132,19 @@ export const useAllocationData = () => {
       try {
         console.log('🔍 Fetching allocation data...');
         
+        // If mock is enabled, return varied allocations
+        if (useMock) {
+          const mock: AllocationItem[] = [
+            { name: 'Ethereum', icon: PROTOCOL_ICONS['ethereum'], apy: 4.7, allocation: 44, color: PROTOCOL_COLORS['ethereum'] },
+            { name: 'Arbitrum Sepolia', icon: PROTOCOL_ICONS['arbitrum sepolia'], apy: 4.0, allocation: 27, color: PROTOCOL_COLORS['arbitrum sepolia'] },
+            { name: 'Base Sepolia', icon: PROTOCOL_COLORS['base sepolia'] ? PROTOCOL_ICONS['base sepolia'] : PROTOCOL_ICONS['base'], apy: 3.3, allocation: 14, color: PROTOCOL_COLORS['base sepolia'] || PROTOCOL_COLORS['base'] },
+            { name: 'Optimism Sepolia', icon: PROTOCOL_ICONS['optimism sepolia'], apy: 3.3, allocation: 15, color: PROTOCOL_COLORS['optimism sepolia'] },
+          ].sort((a,b) => b.allocation - a.allocation);
+          setAllocations(mock);
+          setTotalValue(1234567);
+          return;
+        }
+
         // Fetch NEAR allocation data first (this is the primary source now)
         const nearData = await fetchNearAllocationData();
         
@@ -170,7 +185,7 @@ export const useAllocationData = () => {
     };
 
     fetchAllocationData();
-  }, [isConnected, address]);
+  }, [isConnected, address, useMock]);
 
   const fetchNearAllocationData = async () => {
     try {

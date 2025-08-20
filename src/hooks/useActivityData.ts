@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { gql } from '@apollo/client';
 import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
+import { useMockData } from '@/components/ClientProviders';
 
 // GraphQL query for activity data
 const GET_RECENT_ACTIVITY = gql`
@@ -47,6 +48,7 @@ interface UseActivityDataReturn {
 export function useActivityData(limit: number = 20): UseActivityDataReturn {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const { messages } = useTransactionStatus();
+  const { useMock } = useMockData();
   
   const { data, loading, error, refetch } = useQuery(GET_RECENT_ACTIVITY, {
     variables: { limit },
@@ -144,6 +146,15 @@ export function useActivityData(limit: number = 20): UseActivityDataReturn {
       setActivities(recentTxActivities);
     }
   }, [data, messages, limit]);
+
+  // Override with mock or empty state according to global toggle
+  useEffect(() => {
+    if (useMock) {
+      setActivities(getMockActivityData().slice(0, limit));
+    } else if (!data?.recentActivity || data.recentActivity.length === 0) {
+      setActivities([]);
+    }
+  }, [useMock, limit, data]);
 
   return {
     activities,
