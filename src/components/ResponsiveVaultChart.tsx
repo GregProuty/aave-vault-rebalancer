@@ -155,16 +155,33 @@ const ResponsiveVaultChart: React.FC<ResponsiveVaultChartProps> = ({
             </div>
             <span className="text-secondary text-sm">{currentApy ? (currentApy * 100).toFixed(2) + '% APY' : '4.47% APY'}</span>
           </div>
-          {showMockToggle && (
-            <button
-              onClick={() => setLocalMock(prev => { const next = !prev; setUseMock(next); return next; })}
-              className={`text-xs border border-gray3 rounded-md px-2 py-1 h-7 self-start ${(localMock || globalMock) ? 'bg-gray3 text-primary' : 'bg-gray2 text-secondary hover:bg-gray1'}`}
-              aria-pressed={localMock || globalMock}
-              title="Toggle mock data"
-            >
-              {(localMock || globalMock) ? 'Mock: On' : 'Mock: Off'}
-            </button>
-          )}
+          <div className="flex flex-col items-end space-y-2">
+            {/* Legend */}
+            <div className="hidden sm:flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full" />
+                <span className="text-white text-sm">Yieldr</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <svg width="12" height="12" className="flex-shrink-0">
+                  <circle cx="6" cy="6" r="5" fill="transparent" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeDasharray="2,2" />
+                </svg>
+                <span className="text-white text-sm">Aave</span>
+              </div>
+            </div>
+            {showMockToggle && (
+              <div className="mr-[-5px]">
+              <button
+                onClick={() => setLocalMock(prev => { const next = !prev; setUseMock(next); return next; })}
+                className={`text-xs border border-gray3 rounded-md px-2 py-1 h-7 self-start ${(localMock || globalMock) ? 'bg-gray3 text-primary' : 'bg-gray2 text-secondary hover:bg-gray1'}`}
+                aria-pressed={localMock || globalMock}
+                title="Toggle mock data"
+              >
+                {(localMock || globalMock) ? 'Mock: On' : 'Mock: Off'}
+              </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
