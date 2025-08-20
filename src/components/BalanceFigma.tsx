@@ -480,7 +480,7 @@ export const BalanceFigma = () => {
           </span>
           <button 
             onClick={addTokenToWallet}
-            className="text-gray-400 text-xs border border-gray-600 px-1.5 py-0.5 rounded-sm hover:bg-gray-700 transition-colors"
+            className="bg-gray2 text-primary text-xs border border-gray3 px-3 py-1.5 rounded-lg hover:bg-gray1 transition-colors disabled:opacity-50"
             disabled={!isConnected || !chainId}
           >
             Add to Wallet
