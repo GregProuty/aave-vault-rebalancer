@@ -145,12 +145,12 @@ const ResponsiveVaultChart: React.FC<ResponsiveVaultChartProps> = ({
       {showHeader && (
         <div className="flex justify-between items-start px-6 pt-6 pb-2">
           <div>
-            <h2 className="text-primary text-lg font-semibold mb-2 font-display">Vault</h2>
+            <h2 className="text-primary text-base font-semibold mb-2 font-display">Vault</h2>
             <div className="flex items-center space-x-2 mb-1">
               <img src="/usdc-icon.svg" alt="USDC" className="w-8 h-8" />
               <div className="flex items-baseline space-x-2">
-                <span className="text-primary text-3xl font-semibold font-display">{totalVaultValue ? totalVaultValue.toFixed(2) : '0'}</span>
-                <span className={`text-sm ${vaultGains && vaultGains >= 0 ? 'text-successGreen' : 'text-red-400'}`}>{vaultGains ? (vaultGains >= 0 ? '+' : '') + vaultGains.toFixed(2) : '+0'}</span>
+                <span className="text-primary font-medium font-display text-[40px] leading-[1.2]">{totalVaultValue ? totalVaultValue.toFixed(2) : '0'}</span>
+                <span className={`${vaultGains && vaultGains >= 0 ? 'text-successGreen' : 'text-red-400'} text-xl font-medium font-display`}>{vaultGains ? (vaultGains >= 0 ? '+' : '') + vaultGains.toFixed(2) : '+0'}</span>
               </div>
             </div>
             <span className="text-secondary text-sm">{currentApy ? (currentApy * 100).toFixed(2) + '% APY' : '4.47% APY'}</span>
@@ -160,13 +160,13 @@ const ResponsiveVaultChart: React.FC<ResponsiveVaultChartProps> = ({
             <div className="hidden sm:flex items-center space-x-6">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full" />
-                <span className="text-white text-sm">Yieldr</span>
+                <span className="text-gray5 text-sm">Yieldr</span>
               </div>
               <div className="flex items-center space-x-2">
                 <svg width="12" height="12" className="flex-shrink-0">
                   <circle cx="6" cy="6" r="5" fill="transparent" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeDasharray="2,2" />
                 </svg>
-                <span className="text-white text-sm">Aave</span>
+                <span className="text-gray5 text-sm">Aave</span>
               </div>
             </div>
             {showMockToggle && (

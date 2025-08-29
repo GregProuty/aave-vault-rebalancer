@@ -18,9 +18,10 @@ module.exports = {
         gray2: '#171717',
         gray3: '#202020',
         gray4: '#333333',
+        gray5: '#777777',
         // Text tokens
         primary: '#FFFFFF',
-        secondary: 'rgba(255,255,255,0.7)',
+        secondary: '#777777',
         tertiary: 'rgba(255,255,255,0.55)'
       },
       fontFamily: {

@@ -90,24 +90,21 @@ export const EthereumWalletConnection: React.FC = () => {
                     <div>
                       <button
                         onClick={openAccountModal}
-                        className="w-full bg-gray2 border border-gray3 rounded-xl px-4 py-2 transition-colors hover:bg-gray1"
+                        className="w-full bg-gray2 border border-gray3 rounded-md px-4 py-2 transition-colors hover:bg-gray1"
                       >
                         <div className="flex items-center justify-between">
                           {/* Left: wallet icon + short address */}
                           <div className="flex items-center gap-3">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
-                              <path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2h-6a3 3 0 0 0 0 6h6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="currentColor" strokeWidth="1.5"/>
-                              <path d="M21 11h-6a2 2 0 1 0 0 4h6v-4z" stroke="currentColor" strokeWidth="1.5"/>
-                            </svg>
+                            <img src="/wallet.svg" alt="Wallet" className="w-5 h-5" />
                             <span className="text-base font-medium leading-none">{account.displayName}</span>
                           </div>
                           {/* Right: USDC balance and kebab */}
-                          <div className="flex items-center gap-3">
-                            <div className="text-right leading-tight">
-                              <div className="text-sm font-medium text-secondary">{usdcFormatted}</div>
-                              <div className="text-xs text-secondary">USDC</div>
+                          <div className="flex items-center gap-3 w-24">
+                            <div className="flex items-end text-right leading-none w-full">
+                              <div className="text-sm font-medium text-secondary leading-none">{usdcFormatted}</div>
+                              <div className="text-xs text-secondary leading-none ml-2">USDC</div>
                             </div>
-                            <span className="text-secondary text-base">•••</span>
+                            {/* <span className="text-secondary text-base">•••</span> */}
                           </div>
                         </div>
                       </button>

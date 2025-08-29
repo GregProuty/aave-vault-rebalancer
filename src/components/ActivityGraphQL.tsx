@@ -8,7 +8,7 @@ import { useMockData } from '@/components/ClientProviders';
 
 const ActivityGraphQL = () => {
   const { loading } = usePerformanceData();
-  const { activities, loading: activitiesLoading, error: activitiesError } = useActivityData(15);
+  const { activities, loading: activitiesLoading } = useActivityData(15);
   const { useMock } = useMockData();
   const [timeRemaining, setTimeRemaining] = useState({ hours: 1, minutes: 25 });
 
@@ -30,14 +30,14 @@ const ActivityGraphQL = () => {
 
   // Decide which list to show based on global mock toggle
   const displayActivities = useMock ? getMockActivityData() : activities;
-  const showEmpty = !useMock && !activitiesLoading && (!activities || activities.length === 0) && !activitiesError;
+  const showEmpty = !activitiesLoading && (!displayActivities || displayActivities.length === 0);
 
   if (loading) {
     return (
       <div className="bg-gray1 border border-gray3 text-primary rounded-lg h-full overflow-hidden">
-        <div className="p-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-primary font-display">Activity</h2>
-          <div className="text-sm text-secondary flex items-center">
+        <div className="p-6 flex justify-between items-center">
+          <h2 className="text-base font-semibold text-primary">Activity</h2>
+          <div className="text-xs leading-[1.5] text-gray5 flex items-center justify-end text-right">
             <span>Rebalancing in {timeRemaining.hours}h {timeRemaining.minutes}m</span>
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-2"></div>
           </div>
@@ -54,9 +54,9 @@ const ActivityGraphQL = () => {
       {/* Desktop Layout */}
       <div className="hidden md:flex flex-col h-full">
         {/* Header with countdown */}
-        <div className="p-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-primary font-display">Activity</h2>
-          <div className="text-sm text-secondary flex items-center">
+        <div className="p-6 flex justify-between items-center">
+          <h2 className="text-base font-semibold text-primary">Activity</h2>
+          <div className="text-xs leading-[1.5] text-gray5 flex items-center justify-end text-right">
             <span>Rebalancing in {timeRemaining.hours}h {timeRemaining.minutes}m</span>
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-2"></div>
           </div>
@@ -69,8 +69,29 @@ const ActivityGraphQL = () => {
               <div className="text-secondary">Loading activity...</div>
             </div>
           ) : showEmpty ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="text-secondary">No recent activity</div>
+            <div className="relative flex flex-col h-full">
+              {/* Ghost rows (exact layout: icon + two muted bars of varying widths) */}
+              <div className="space-y-4 px-6 pt-2">
+                {[
+                  { w: [112, 36], icon: '/rebalance.svg' },
+                  { w: [100, 44], icon: '/deposit.svg' },
+                  { w: [108, 28], icon: '/harvest.svg' }
+                ].map((row, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 flex items-center justify-center opacity-30">
+                      <Image src={row.icon} alt="placeholder" width={16} height={16} className="filter brightness-0 invert" />
+                    </div>
+                    <div className="flex items-center gap-3 opacity-20">
+                      <div className="h-2 bg-gray3 rounded" style={{ width: row.w[0] }} />
+                      <div className="h-2 bg-gray3 rounded" style={{ width: row.w[1] }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Centered caption overlay */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="text-xs text-gray5">No deposits yet…</div>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -118,7 +139,7 @@ const ActivityGraphQL = () => {
         {/* Header with countdown */}
         <div className="p-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-primary">Activity</h2>
-          <div className="text-sm text-secondary flex items-center">
+          <div className="text-xs leading-[1.5] text-gray5 flex items-center justify-end text-right">
             <span>Rebalancing in {timeRemaining.hours}h {timeRemaining.minutes}m</span>
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-2"></div>
           </div>
@@ -131,8 +152,27 @@ const ActivityGraphQL = () => {
               <div className="text-secondary">Loading activity...</div>
             </div>
           ) : showEmpty ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="text-secondary">No recent activity</div>
+            <div className="relative flex flex-col h-full">
+              <div className="space-y-4 px-6 pt-2">
+                {[
+                  { w: [112, 36], icon: '/rebalance.svg' },
+                  { w: [100, 44], icon: '/deposit.svg' },
+                  { w: [108, 28], icon: '/harvest.svg' }
+                ].map((row, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 flex items-center justify-center opacity-30">
+                      <Image src={row.icon} alt="placeholder" width={16} height={16} className="filter brightness-0 invert" />
+                    </div>
+                    <div className="flex items-center gap-3 opacity-20">
+                      <div className="h-2 bg-gray3 rounded" style={{ width: row.w[0] }} />
+                      <div className="h-2 bg-gray3 rounded" style={{ width: row.w[1] }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="text-xs text-gray5">No deposits yet…</div>
+              </div>
             </div>
           ) : (
             <div className="space-y-3 max-h-64 overflow-y-auto">

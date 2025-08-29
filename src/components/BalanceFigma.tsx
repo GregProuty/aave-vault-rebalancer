@@ -456,14 +456,14 @@ export const BalanceFigma = () => {
   const renderBalanceState = () => (
     <>
       {/* Title inside the card */}
-      <h3 className="text-lg font-semibold mb-6 text-white font-display">Balance</h3>
+      <h3 className="text-base font-semibold leading-[1.2] mb-6 text-white font-display">Balance</h3>
       {/* Balance Section - user's deposited funds in the vault */}
       <div className="mb-6">
         <div className="flex items-center space-x-3 mb-2">
           {/* USDC Icon */}
           <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
           
-          <div className="text-3xl font-semibold font-display">{userDepositedFormatted}</div>
+          <div className="font-display font-medium text-[40px] leading-[1.2]">{userDepositedFormatted}</div>
         </div>
         
         <div className="text-gray-400 text-sm">
@@ -480,7 +480,7 @@ export const BalanceFigma = () => {
           </span>
           <button 
             onClick={addTokenToWallet}
-            className="bg-gray2 text-primary text-xs border border-gray3 px-3 py-1.5 rounded-lg hover:bg-gray1 transition-colors disabled:opacity-50"
+            className="bg-gray2 text-primary text-xs border border-gray3 px-3 py-1.5 rounded-md hover:bg-gray1 transition-colors disabled:opacity-50"
             disabled={!isConnected || !chainId}
           >
             Add to Wallet
@@ -489,7 +489,7 @@ export const BalanceFigma = () => {
       </div>
 
       {/* Subtle line separator */}
-      <div className="border-t border-gray-700 mb-4"></div>
+      <div className="border-t border-gray3 mb-4"></div>
 
       {/* Simple Action Buttons */}
       <div className="grid grid-cols-2 gap-2">

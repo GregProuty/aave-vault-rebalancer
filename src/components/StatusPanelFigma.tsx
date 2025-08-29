@@ -32,16 +32,16 @@ const StatusPanelFigma = () => {
         </div>
       ) : (
         <div className="bg-gray2 border border-gray3 rounded-lg p-4">
-          <h2 className="text-white text-lg font-semibold mb-2 font-display">Welcome!</h2>
-          <p className="text-secondary text-sm leading-relaxed mb-4">
+          <h3 className="text-white text-2xl font-semibold mb-2 font-display">Welcome!</h3>
+          <p className="text-white text-sm leading-relaxed mb-4">
             I am Yieldr, the first multichain agentic protocol that automatically maximizes your Aave earnings with unparalleled reliability.
             Get started by approving a spending limit and depositing into the vault.
           </p>
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2 rounded-lg border border-gray4 text-primary bg-transparent">
+            <button className="px-4 py-2 rounded-md border border-gray4 text-primary bg-transparent">
               Help
             </button>
-            <button className="px-4 py-2 rounded-lg bg-white text-black font-medium">
+            <button className="px-4 py-2 rounded-md bg-white text-black font-medium">
               Get started
             </button>
           </div>

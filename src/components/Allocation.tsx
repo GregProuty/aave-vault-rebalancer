@@ -49,17 +49,17 @@ const Allocation = ({ allocations }: AllocationProps) => {
     <div className="bg-gray1 border border-gray3 text-primary rounded-lg w-full h-full overflow-x-hidden max-w-full">
       {/* Desktop Layout */}
       <div className="hidden md:flex flex-col p-6 w-full h-full overflow-hidden max-w-full">
-        <h2 className="text-lg font-semibold mb-6 font-display">Allocation</h2>
+        <h2 className="text-base font-semibold mb-6">Allocation</h2>
         
         {/* Always show allocation visual and details */}
         <>
           {/* Visual allocation bars - segmented with gaps and reduced radius */}
           <div className="mb-6">
-            <div className="flex h-16 rounded-lg gap-1 w-full">
+            <div className="flex h-[100px] rounded-[4px] gap-1 w-full">
               {displayAllocations.filter(item => item.allocation > 0).map((item, index, arr) => (
                 <div
                   key={index}
-                  className={`${index === 0 ? 'rounded-l-lg' : ''} ${index === arr.length - 1 ? 'rounded-r-lg' : ''} h-full relative`}
+                  className={`${index === 0 ? 'rounded-l-[4px]' : ''} ${index === arr.length - 1 ? 'rounded-r-[4px]' : ''} h-full relative`}
                   style={{ flex: `0 0 ${item.allocation}%`, backgroundColor: item.color }}
                 >
                   {/* Stripe overlay */}
@@ -104,8 +104,8 @@ const Allocation = ({ allocations }: AllocationProps) => {
                   <span className="text-primary font-medium truncate">{item.name}</span>
                 </div>
                 
-                {/* Middle - APY */}
-                <div className="text-secondary text-sm mx-4 shrink-0">
+                {/* Middle - APY (centered between name and indicator) */}
+                <div className="text-gray5 text-sm mx-4 shrink-0 text-center w-32">
                   {item.apy}% APY
                 </div>
                 
@@ -117,7 +117,7 @@ const Allocation = ({ allocations }: AllocationProps) => {
                       style={{ width: `${item.allocation}%` }}
                     />
                   </div>
-                  <span className="text-primary text-sm font-medium w-12 text-right">
+                  <span className="text-gray5 text-sm font-medium w-12 text-right">
                     {item.allocation}%
                   </span>
                 </div>
@@ -130,15 +130,15 @@ const Allocation = ({ allocations }: AllocationProps) => {
 
       {/* Mobile Layout */}
       <div className="md:hidden p-4 overflow-x-hidden max-w-full">
-        <h2 className="text-lg font-medium mb-4 font-display">Allocation</h2>
+        <h2 className="text-base font-semibold mb-4">Allocation</h2>
         
         {/* Visual allocation bars */}
         <div className="mb-4">
-          <div className="flex h-12 rounded-lg gap-1 w-full">
+          <div className="flex h-[100px] rounded-[4px] gap-1 w-full">
             {displayAllocations.map((item, index, arr) => (
               <div
                 key={index}
-                className={`${index === 0 ? 'rounded-l-lg' : ''} ${index === arr.length - 1 ? 'rounded-r-lg' : ''} h-full relative`}
+                className={`${index === 0 ? 'rounded-l-[4px]' : ''} ${index === arr.length - 1 ? 'rounded-r-[4px]' : ''} h-full relative`}
                 style={{ flex: `0 0 ${item.allocation}%`, backgroundColor: item.color }}
               >
                 {/* Stripe overlay */}
@@ -185,7 +185,7 @@ const Allocation = ({ allocations }: AllocationProps) => {
               </div>
               
               {/* Right side - Percentage */}
-              <span className="text-white text-sm font-medium">
+              <span className="text-gray5 text-sm font-medium">
                 {item.allocation}%
               </span>
             </div>
