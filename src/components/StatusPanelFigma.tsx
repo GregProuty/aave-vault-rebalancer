@@ -2,9 +2,11 @@
 
 import React from 'react';
 import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
+import { useWelcome } from '@/contexts/WelcomeContext';
 
 const StatusPanelFigma = () => {
   const { messages } = useTransactionStatus();
+  const { showWelcome, dismissWelcome } = useWelcome();
 
   // Icon/color helpers not used in current design; remove to satisfy linter
 
@@ -13,7 +15,7 @@ const StatusPanelFigma = () => {
       {/* Header with logo and title */}
       <div className="flex items-center space-x-3 mb-4">
         {/* Yieldr Logo */}
-        <img src="/logo.svg" alt="Yieldr" className="w-8 h-8" />
+        <img src="/logo.svg" alt="Yieldr" className="w-11 h-11" />
         {/* <h1 className="text-lg font-medium text-white">YIELDR</h1> */}
       </div>
 
@@ -30,7 +32,7 @@ const StatusPanelFigma = () => {
             </div>
           ))}
         </div>
-      ) : (
+      ) : showWelcome ? (
         <div className="bg-gray2 border border-gray3 rounded-lg p-4">
           <h3 className="text-white text-2xl font-semibold mb-2 font-display">Welcome!</h3>
           <p className="text-white text-sm leading-relaxed mb-4">
@@ -38,15 +40,18 @@ const StatusPanelFigma = () => {
             Get started by approving a spending limit and depositing into the vault.
           </p>
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2 rounded-md border border-gray4 text-primary bg-transparent">
+            <button className="w-[100px] py-2 rounded-md border border-gray4 text-primary bg-transparent font-medium text-sm">
               Help
             </button>
-            <button className="px-4 py-2 rounded-md bg-white text-black font-medium">
+            <button 
+              onClick={dismissWelcome}
+              className="flex-1 py-2 rounded-md bg-white text-black font-medium text-sm"
+            >
               Get started
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

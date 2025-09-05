@@ -5,6 +5,7 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadCont
 import { parseUnits, formatUnits } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
 import { validateAmount, validateChainId, DepositSchema, WithdrawSchema, ApprovalSchema } from '@/lib/validation';
+import { useWelcome } from '@/contexts/WelcomeContext';
 
 // Mobile Number Pad Component
 const NumberPad = ({ onNumberClick, onBackspace, onClear }: {
@@ -63,6 +64,7 @@ const MobileModal = ({ isOpen, children }: {
 
 export const VaultActions: React.FC = () => {
   const { address, isConnected, chainId } = useAccount();
+  const { hasDeposits } = useWelcome();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   
   const [depositAmount, setDepositAmount] = useState('');
@@ -684,41 +686,43 @@ export const VaultActions: React.FC = () => {
           </div>
         </div>
 
-        {/* Withdraw Section */}
-        <div className="p-4 bg-gray-800 rounded-lg">
-          <label className="block text-sm font-medium text-gray-300 mb-3">
-            Withdraw Amount (USDC)
-          </label>
-          <div className="space-y-3">
-            <input
-              type="number"
-              value={withdrawAmount}
-              onChange={(e) => {
-                const value = e.target.value;
-                setWithdrawAmount(value);
-                validateWithdrawAmount(value);
-              }}
-              placeholder="0.0"
-              className={`w-full bg-gray-700 border rounded-lg px-3 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:ring-1 ${
-                withdrawError 
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                  : 'border-gray-600 focus:border-blue-500 focus:ring-blue-500'
-              }`}
-            />
-            {withdrawError && (
-              <div className="text-red-400 text-xs mt-1">{withdrawError}</div>
-            )}
-            <button
-              onClick={handleWithdraw}
-              disabled={!withdrawAmount || withdrawError !== null || isWithdrawing || isPending || isConfirming}
-              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-            >
-              <span className="truncate block">
-                {isWithdrawing || (isPending && !isDepositing && !isApproving) || isConfirming ? 'Withdrawing...' : 'Withdraw'}
-              </span>
-            </button>
+        {/* Withdraw Section - Only show if user has deposits */}
+        {hasDeposits && (
+          <div className="p-4 bg-gray-800 rounded-lg">
+            <label className="block text-sm font-medium text-gray-300 mb-3">
+              Withdraw Amount (USDC)
+            </label>
+            <div className="space-y-3">
+              <input
+                type="number"
+                value={withdrawAmount}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setWithdrawAmount(value);
+                  validateWithdrawAmount(value);
+                }}
+                placeholder="0.0"
+                className={`w-full bg-gray-700 border rounded-lg px-3 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:ring-1 ${
+                  withdrawError 
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                    : 'border-gray-600 focus:border-blue-500 focus:ring-blue-500'
+                }`}
+              />
+              {withdrawError && (
+                <div className="text-red-400 text-xs mt-1">{withdrawError}</div>
+              )}
+              <button
+                onClick={handleWithdraw}
+                disabled={!withdrawAmount || withdrawError !== null || isWithdrawing || isPending || isConfirming}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+              >
+                <span className="truncate block">
+                  {isWithdrawing || (isPending && !isDepositing && !isApproving) || isConfirming ? 'Withdrawing...' : 'Withdraw'}
+                </span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Transaction Status */}
@@ -776,13 +780,15 @@ export const VaultActions: React.FC = () => {
             4.87% APY
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={handleMobileWithdraw}
-              className="bg-gray-700 text-white py-3 px-4 rounded-lg font-medium"
-            >
-              Withdraw
-            </button>
+          <div className={`grid gap-3 ${hasDeposits ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {hasDeposits && (
+              <button
+                onClick={handleMobileWithdraw}
+                className="bg-gray-700 text-white py-3 px-4 rounded-lg font-medium"
+              >
+                Withdraw
+              </button>
+            )}
             <button
               onClick={handleMobileDeposit}
               className="bg-white text-black py-3 px-4 rounded-lg font-medium"

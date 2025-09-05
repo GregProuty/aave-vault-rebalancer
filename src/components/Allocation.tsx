@@ -109,15 +109,15 @@ const Allocation = ({ allocations }: AllocationProps) => {
                   {item.apy}% APY
                 </div>
                 
-                {/* Right side - Progress bar and percentage */}
-                <div className="flex items-center space-x-3 w-36 shrink-0">
+                {/* Right side - Progress bar and percentage grouped and right-aligned */}
+                <div className="flex items-center space-x-2 w-32 shrink-0 justify-end">
                   <div className="flex-1 bg-gray2 rounded-full h-1.5">
                     <div 
                       className="bg-white rounded-full h-1.5 transition-all duration-300"
                       style={{ width: `${item.allocation}%` }}
                     />
                   </div>
-                  <span className="text-gray5 text-sm font-medium w-12 text-right">
+                  <span className="text-gray5 text-sm font-medium w-10 text-right">
                     {item.allocation}%
                   </span>
                 </div>

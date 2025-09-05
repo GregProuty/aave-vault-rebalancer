@@ -7,9 +7,11 @@ import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@
 import { usePerformanceData } from '@/hooks/usePerformanceData';
 import { Button } from '@/components/Button';
 import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
+import { useWelcome } from '@/contexts/WelcomeContext';
 
 export const BalanceFigma = () => {
   const { address, isConnected, chainId, connector } = useAccount();
+  const { hasDeposits } = useWelcome();
   const [currentState, setCurrentState] = useState<'balance' | 'deposit' | 'withdraw'>('balance');
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -492,14 +494,16 @@ export const BalanceFigma = () => {
       <div className="border-t border-gray3 mb-4"></div>
 
       {/* Simple Action Buttons */}
-      <div className="grid grid-cols-2 gap-2">
-        <Button 
-          variant="secondary"
-          onClick={handleWithdrawClick}
-          disabled={!isConnected}
-        >
-          Withdraw
-        </Button>
+      <div className={`grid gap-2 ${hasDeposits ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {hasDeposits && (
+          <Button 
+            variant="secondary"
+            onClick={handleWithdrawClick}
+            disabled={!isConnected}
+          >
+            Withdraw
+          </Button>
+        )}
         <Button 
           variant="primary"
           onClick={handleDeposit}
@@ -664,8 +668,8 @@ export const BalanceFigma = () => {
             <h3 className="text-xl font-medium text-white font-display">Deposit</h3>
           </div>
           
-          {/* Summary Card */}
-          <div className="bg-gray-700 rounded-lg p-4 mb-6">
+          {/* Summary */}
+          <div className="mb-6">
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-300 text-sm">Deposits</span>
@@ -843,8 +847,8 @@ export const BalanceFigma = () => {
             <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
           </div>
           
-          {/* Summary Card */}
-          <div className="bg-gray-700 rounded-lg p-4 mb-6">
+          {/* Summary */}
+          <div className="mb-6">
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-300 text-sm">Deposits</span>
@@ -921,8 +925,8 @@ export const BalanceFigma = () => {
             <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
           </div>
           
-          {/* Summary Card */}
-          <div className="bg-gray-700 rounded-lg p-4 mb-6">
+          {/* Summary */}
+          <div className="mb-6">
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-300 text-sm">Deposits</span>
@@ -960,8 +964,8 @@ export const BalanceFigma = () => {
             <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
           </div>
           
-          {/* Summary Card */}
-          <div className="bg-gray-700 rounded-lg p-4 mb-6">
+          {/* Summary */}
+          <div className="mb-6">
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-300 text-sm">Deposits</span>
