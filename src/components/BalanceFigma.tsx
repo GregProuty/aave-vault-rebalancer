@@ -8,10 +8,12 @@ import { usePerformanceData } from '@/hooks/usePerformanceData';
 import { Button } from '@/components/Button';
 import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
 import { useWelcome } from '@/contexts/WelcomeContext';
+import { useDeposit } from '@/contexts/DepositContext';
 
 export const BalanceFigma = () => {
   const { address, isConnected, chainId, connector } = useAccount();
   const { hasDeposits } = useWelcome();
+  const { setTriggerDepositCallback } = useDeposit();
   const [currentState, setCurrentState] = useState<'balance' | 'deposit' | 'withdraw'>('balance');
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -204,6 +206,11 @@ export const BalanceFigma = () => {
     setDepositStep('input');
     setDepositAmount('');
   };
+
+  // Register deposit handler with context for welcome message to use
+  useEffect(() => {
+    setTriggerDepositCallback(handleDeposit);
+  }, [setTriggerDepositCallback]);
 
   // New function to handle the actual deposit initiation
   const handleInitiateDeposit = () => {
@@ -606,7 +613,7 @@ export const BalanceFigma = () => {
               aria-busy={isUSDCPending || isUSDCTxLoading}
             >
               {(isUSDCPending || isUSDCTxLoading) ? (
-                <img src="/loader.svg" alt="Loading" className="w-5 h-5 animate-spin" />
+                'Processing...'
               ) : (
                 'Confirm'
               )}
@@ -647,7 +654,7 @@ export const BalanceFigma = () => {
             className="w-full bg-gray3 text-white h-12 px-4 rounded-lg font-medium text-sm cursor-not-allowed flex items-center justify-center border border-gray4"
             aria-busy="true"
           >
-            <img src="/loader.svg" alt="Loading" className="w-5 h-5 animate-spin" />
+            Processing...
           </button>
         </>
       );
@@ -948,7 +955,7 @@ export const BalanceFigma = () => {
           {/* Processing indicator as spinner button */}
           <div className="py-4">
             <button disabled className="w-full bg-gray3 text-white h-12 px-4 rounded-lg font-medium text-sm cursor-not-allowed flex items-center justify-center border border-gray4" aria-busy="true">
-              <img src="/loader.svg" alt="Loading" className="w-5 h-5 animate-spin" />
+              Processing...
             </button>
           </div>
         </>

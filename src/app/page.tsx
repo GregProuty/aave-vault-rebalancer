@@ -12,6 +12,8 @@ import { useAllocationData } from "@/hooks/useAllocationData";
 import { usePerformanceData } from "@/hooks/usePerformanceData";
 import { TransactionStatusProvider } from "@/contexts/TransactionStatusContext";
 import { WelcomeProvider } from "@/contexts/WelcomeContext";
+import { MessageStateProvider } from "@/contexts/MessageStateContext";
+import { DepositProvider } from "@/contexts/DepositContext";
 import Image from "next/image";
 
 
@@ -31,8 +33,10 @@ function MainContent() {
   // Welcome modal disabled - no popups
 
   return (
-    <TransactionStatusProvider>
-      <div className="min-h-screen bg-[#0a0a0a] text-white">
+          <TransactionStatusProvider>
+            <MessageStateProvider>
+              <DepositProvider>
+                <div className="min-h-screen bg-[#0a0a0a] text-white">
       {/* Mobile Header with logo (left) and hamburger (right) */}
       <div className="flex justify-between items-center p-4 pt-12 md:hidden">
         <Image src="/logo.svg" alt="Yieldr" width={32} height={32} />
@@ -178,8 +182,10 @@ function MainContent() {
           </div>
         </div>
       </div>
-      </div>
-    </TransactionStatusProvider>
+              </div>
+              </DepositProvider>
+            </MessageStateProvider>
+          </TransactionStatusProvider>
   );
 }
 

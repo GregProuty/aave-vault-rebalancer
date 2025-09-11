@@ -1,12 +1,28 @@
 'use client';
 
 import React from 'react';
-import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
+import { useMessageState } from '@/contexts/MessageStateContext';
 import { useWelcome } from '@/contexts/WelcomeContext';
+import { WELCOME, WELCOME_BACK } from '@/constants/messages';
+import { Message } from '@/components/Message';
+import { useMessages } from '@/hooks/useMessages';
+import { useDeposit } from '@/contexts/DepositContext';
 
 const StatusPanelFigma = () => {
-  const { messages } = useTransactionStatus();
-  const { showWelcome, dismissWelcome } = useWelcome();
+  const { primaryMessage } = useMessageState();
+  const { yieldEarned, dismissWelcome } = useWelcome();
+  const { showDepositInfo } = useMessages();
+  const { triggerDeposit } = useDeposit();
+
+  const handleHelpClick = () => {
+    showDepositInfo();
+  };
+
+  const handleGetStartedClick = () => {
+    // Trigger deposit and dismiss welcome message
+    triggerDeposit();
+    dismissWelcome();
+  };
 
   // Icon/color helpers not used in current design; remove to satisfy linter
 
@@ -19,38 +35,51 @@ const StatusPanelFigma = () => {
         {/* <h1 className="text-lg font-medium text-white">YIELDR</h1> */}
       </div>
 
-      {/* Status messages */}
-      {messages.length > 0 ? (
-        <div className="space-y-3">
-          {messages.map((message) => (
-            <div key={message.id} className="bg-gray2 rounded-xl px-4 py-3">
-              <div className="flex items-center">
-                <span className="text-sm text-primary">
-                  {message.message}
-                </span>
+      {/* Status messages using new state system */}
+      {primaryMessage ? (
+        <Message
+          type={primaryMessage.type}
+          category={primaryMessage.category}
+          id={primaryMessage.id}
+          persistent={primaryMessage.persistent}
+        >
+          {primaryMessage.category === 'welcome-back' ? (
+            <p>
+              {WELCOME_BACK.PREFIX}
+              <span className="font-semibold text-green-400">{yieldEarned} {WELCOME_BACK.CURRENCY}</span>
+              {WELCOME_BACK.SUFFIX}
+            </p>
+          ) : primaryMessage.category === 'welcome' ? (
+            <div>
+              <h3 className="text-white text-2xl font-semibold mb-2 font-display">{WELCOME.TITLE}</h3>
+              <p className="text-white text-sm leading-relaxed mb-4">
+                {WELCOME.DESCRIPTION}
+              </p>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleHelpClick}
+                  className="w-[100px] py-2 rounded-md border border-gray4 text-primary bg-transparent font-medium text-sm"
+                >
+                  {WELCOME.BUTTONS.HELP}
+                </button>
+                <button 
+                  onClick={handleGetStartedClick}
+                  className="flex-1 py-2 rounded-md bg-white text-black font-medium text-sm"
+                >
+                  {WELCOME.BUTTONS.GET_STARTED}
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      ) : showWelcome ? (
-        <div className="bg-gray2 border border-gray3 rounded-lg p-4">
-          <h3 className="text-white text-2xl font-semibold mb-2 font-display">Welcome!</h3>
-          <p className="text-white text-sm leading-relaxed mb-4">
-            I am Yieldr, the first multichain agentic protocol that automatically maximizes your Aave earnings with unparalleled reliability.
-            Get started by approving a spending limit and depositing into the vault.
-          </p>
-          <div className="flex items-center gap-3">
-            <button className="w-[100px] py-2 rounded-md border border-gray4 text-primary bg-transparent font-medium text-sm">
-              Help
-            </button>
-            <button 
-              onClick={dismissWelcome}
-              className="flex-1 py-2 rounded-md bg-white text-black font-medium text-sm"
-            >
-              Get started
-            </button>
-          </div>
-        </div>
+          ) : (
+            <div>
+              {primaryMessage.content.split('\n\n').map((paragraph, index) => (
+                <p key={index} className={index > 0 ? 'mt-4' : ''}>
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+          )}
+        </Message>
       ) : null}
     </div>
   );
