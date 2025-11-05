@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_GRAPHQL_URL: process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:4000/graphql',
     NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID,
   },
+  devIndicators: false,
 };
 
 export default nextConfig;

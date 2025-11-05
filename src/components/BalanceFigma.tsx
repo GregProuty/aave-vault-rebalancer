@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatUnits, parseUnits } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
+import { getDepositSignature } from '@/utils/oracleClient';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
 import { Button } from '@/components/Button';
 import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
@@ -201,16 +202,16 @@ export const BalanceFigma = () => {
   };
 
   // Simple state change functions
-  const handleDeposit = () => {
+  const handleDeposit = useCallback(() => {
     setCurrentState('deposit');
     setDepositStep('input');
     setDepositAmount('');
-  };
+  }, []);
 
   // Register deposit handler with context for welcome message to use
   useEffect(() => {
     setTriggerDepositCallback(handleDeposit);
-  }, [setTriggerDepositCallback]);
+  }, [setTriggerDepositCallback, handleDeposit]);
 
   // New function to handle the actual deposit initiation
   const handleInitiateDeposit = () => {
@@ -322,16 +323,58 @@ export const BalanceFigma = () => {
     
     try {
       removeMessage('deposit-approving');
-      upsertMessage('deposit-pending', { type: 'pending', message: 'Deposit in progress...' });
+      upsertMessage('deposit-pending', { type: 'pending', message: 'Getting cross-chain signature...' });
+      
       const amountInWei = parseUnits(depositAmount, 6);
       
-      await writeVault({
-        address: getContractAddress(chainId) as `0x${string}`,
-        abi: AAVE_VAULT_ABI,
-        functionName: 'deposit',
-        args: [amountInWei, address],
-        chainId,
-      });
+      // Get signed balance snapshot from oracle
+      console.log('Requesting signature from oracle...');
+      const snapshot = await getDepositSignature(
+        amountInWei.toString(),
+        address,
+        chainId
+      );
+      console.log('Signature received from oracle:', snapshot);
+      
+      // Check if cross-chain assets exist (balance > 0)
+      // The contract requires crossChainInvestedAssets > 0 for depositWithSignature
+      if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
+        console.log('⚠️ No cross-chain assets yet, using regular deposit method');
+        upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
+        
+        // Use regular deposit when no cross-chain assets exist
+        await writeVault({
+          address: getContractAddress(chainId) as `0x${string}`,
+          abi: AAVE_VAULT_ABI,
+          functionName: 'deposit',
+          args: [amountInWei, address as `0x${string}`],
+          chainId,
+        });
+        
+      } else {
+        console.log('🔐 Using deposit with signature (cross-chain assets: ' + snapshot.balance + ')');
+        upsertMessage('deposit-pending', { type: 'pending', message: 'Deposit with signature in progress...' });
+        
+        // Call depositWithExtraInfoViaSignature with the signed snapshot
+        await writeVault({
+          address: getContractAddress(chainId) as `0x${string}`,
+          abi: AAVE_VAULT_ABI,
+          functionName: 'depositWithExtraInfoViaSignature',
+          args: [
+            amountInWei,
+            address as `0x${string}`,
+            {
+              balance: BigInt(snapshot.balance),
+              nonce: BigInt(snapshot.nonce),
+              deadline: BigInt(snapshot.deadline),
+              assets: BigInt(snapshot.assets),
+              receiver: snapshot.receiver as `0x${string}`,
+            },
+            snapshot.signature as `0x${string}`,
+          ],
+          chainId,
+        });
+      }
       
       // Transaction submitted successfully - the useEffect will handle the rest
       
@@ -353,6 +396,10 @@ export const BalanceFigma = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } else if ((error as any)?.message?.includes('insufficient funds')) {
         setErrorMessage('Insufficient USDC balance or gas fee.');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } else if ((error as any)?.message?.includes('Oracle')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setErrorMessage(`Oracle service error: ${(error as any)?.message || 'Unable to get signature.'}`);
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setErrorMessage(`Deposit failed: ${(error as any)?.message || 'Please check your wallet and try again.'}`);

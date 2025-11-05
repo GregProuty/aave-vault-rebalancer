@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react';
 
 interface DepositContextType {
   triggerDeposit: () => void;
@@ -24,20 +24,20 @@ interface DepositProviderProps {
 export const DepositProvider: React.FC<DepositProviderProps> = ({ children }) => {
   const [depositCallback, setDepositCallback] = useState<(() => void) | null>(null);
 
-  const triggerDeposit = () => {
+  const triggerDeposit = useCallback(() => {
     if (depositCallback) {
       depositCallback();
     }
-  };
+  }, [depositCallback]);
 
-  const setTriggerDepositCallback = (callback: () => void) => {
+  const setTriggerDepositCallback = useCallback((callback: () => void) => {
     setDepositCallback(() => callback);
-  };
+  }, []);
 
-  const contextValue: DepositContextType = {
+  const contextValue: DepositContextType = useMemo(() => ({
     triggerDeposit,
     setTriggerDepositCallback,
-  };
+  }), [triggerDeposit, setTriggerDepositCallback]);
 
   return (
     <DepositContext.Provider value={contextValue}>
@@ -45,3 +45,4 @@ export const DepositProvider: React.FC<DepositProviderProps> = ({ children }) =>
     </DepositContext.Provider>
   );
 };
+

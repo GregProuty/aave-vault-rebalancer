@@ -2,8 +2,8 @@
 export const CONTRACT_ADDRESSES = {
   localhost: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788',
   ethereum: '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2', // AAVE V3 Pool on Ethereum mainnet
-  baseSepolia: '0xa189176b780Db31024038aD1C8080f62d87d5aea', // AaveVault on Base Sepolia
-  arbitrumSepolia: '0x858a8afff11bfccb61e69da87eba1ecccc34c640', // AaveVault on Arbitrum Sepolia (deployed by coworker)
+  baseSepolia: '0x773035EABdA16B5416B26E12156483C6B6F56451', // AaveVault on Base Sepolia (CORRECT AI_AGENT)
+  arbitrumSepolia: '0xB5412604ea7E3EeC4043Bd8F1BE1D3aA357A6185', // AaveVault on Arbitrum Sepolia (CORRECT AI_AGENT)
   optimismSepolia: '', // To be deployed
 } as const;
 
@@ -11,7 +11,7 @@ export const CONTRACT_ADDRESSES = {
 export const USDC_ADDRESSES = {
   localhost: '0x16f18Ee01365Ef23E0564dfB635215A5B4Eaa3c4', // MockUSDC for local testing
   ethereum: '0xA0b86a33E6441E43941295AaE15D29a6E6e98959', // USDC on Ethereum mainnet  
-  baseSepolia: '0x23a4e6740F7b658Ad5041D1720b16508a725d53d', // MockUSDC for Base Sepolia testing
+  baseSepolia: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Circle's official USDC on Base Sepolia testnet
   arbitrumSepolia: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', // Circle's official USDC on Arbitrum Sepolia testnet
   optimismSepolia: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7', // Circle's official USDC on Optimism Sepolia testnet
 } as const;
@@ -70,6 +70,29 @@ export const AAVE_VAULT_ABI = [
       {"internalType": "address", "name": "receiver", "type": "address"}
     ],
     "name": "deposit",
+    "outputs": [{"internalType": "uint256", "name": "shares", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "assets", "type": "uint256"},
+      {"internalType": "address", "name": "receiver", "type": "address"},
+      {
+        "components": [
+          {"internalType": "uint256", "name": "balance", "type": "uint256"},
+          {"internalType": "uint256", "name": "nonce", "type": "uint256"},
+          {"internalType": "uint256", "name": "deadline", "type": "uint256"},
+          {"internalType": "uint256", "name": "assets", "type": "uint256"},
+          {"internalType": "address", "name": "receiver", "type": "address"}
+        ],
+        "internalType": "struct AaveVault.CrossChainBalanceSnapshot",
+        "name": "snapshot",
+        "type": "tuple"
+      },
+      {"internalType": "bytes", "name": "signature", "type": "bytes"}
+    ],
+    "name": "depositWithExtraInfoViaSignature",
     "outputs": [{"internalType": "uint256", "name": "shares", "type": "uint256"}],
     "stateMutability": "nonpayable",
     "type": "function"

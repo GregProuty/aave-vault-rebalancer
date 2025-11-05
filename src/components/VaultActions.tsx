@@ -6,6 +6,7 @@ import { parseUnits, formatUnits } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
 import { validateAmount, validateChainId, DepositSchema, WithdrawSchema, ApprovalSchema } from '@/lib/validation';
 import { useWelcome } from '@/contexts/WelcomeContext';
+import { getDepositSignature } from '@/utils/oracleClient';
 
 // Mobile Number Pad Component
 const NumberPad = ({ onNumberClick, onBackspace, onClear }: {
@@ -342,22 +343,74 @@ export const VaultActions: React.FC = () => {
   };
 
   const handleDeposit = async () => {
-    if (!address || !contractAddress || !depositAmount) return;
+    if (!address || !contractAddress || !depositAmount || !chainId) return;
 
     try {
       setIsDepositing(true);
       console.log('💸 Starting deposit:', depositAmount, 'USDC');
       
-      await writeContract({
-        address: contractAddress as `0x${string}`,
-        abi: AAVE_VAULT_ABI,
-        functionName: 'deposit',
-        args: [parseUnits(depositAmount, 6), address], // USDC has 6 decimals
-      });
+      const amountInWei = parseUnits(depositAmount, 6);
       
-      console.log('📝 Deposit transaction submitted, waiting for confirmation...');
+      // Try to get signature from oracle first
+      console.log('🔐 Requesting signature from oracle...');
+      const snapshot = await getDepositSignature(
+        amountInWei.toString(),
+        address,
+        chainId
+      );
+      console.log('✅ Signature received from oracle:', snapshot);
+      
+      // Check if cross-chain assets exist (balance > 0)
+      // The contract requires crossChainInvestedAssets > 0 for depositWithSignature
+      if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
+        console.log('⚠️ No cross-chain assets yet, using regular deposit method');
+        console.log('   (Oracle integration tested ✅ - signature received successfully)');
+        
+        // Use regular deposit when no cross-chain assets exist
+        await writeContract({
+          address: contractAddress as `0x${string}`,
+          abi: AAVE_VAULT_ABI,
+          functionName: 'deposit',
+          args: [amountInWei, address as `0x${string}`],
+        });
+        
+        console.log('📝 Regular deposit transaction submitted');
+      } else {
+        console.log('🔐 Using deposit with signature (cross-chain assets: ' + snapshot.balance + ')');
+        
+        // Use depositWithSignature when cross-chain assets exist
+        await writeContract({
+          address: contractAddress as `0x${string}`,
+          abi: AAVE_VAULT_ABI,
+          functionName: 'depositWithExtraInfoViaSignature',
+          args: [
+            amountInWei,
+            address as `0x${string}`,
+            {
+              balance: BigInt(snapshot.balance),
+              nonce: BigInt(snapshot.nonce),
+              deadline: BigInt(snapshot.deadline),
+              assets: BigInt(snapshot.assets),
+              receiver: snapshot.receiver as `0x${string}`,
+            },
+            snapshot.signature as `0x${string}`,
+          ],
+        });
+        
+        console.log('📝 Deposit with signature transaction submitted');
+      }
+      
     } catch (err) {
       console.error('Deposit failed:', err);
+      
+      // Enhanced error handling for oracle-specific errors
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((err as any)?.message?.includes('Oracle') || 
+          (err as any)?.message?.includes('oracle') ||
+          (err as any)?.message?.includes('signature')) {
+        console.error('Oracle service error:', err);
+      }
+      
       setIsDepositing(false); // Only reset on error
     }
   };
