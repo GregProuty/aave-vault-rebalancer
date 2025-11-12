@@ -50,6 +50,30 @@ const GET_SHARE_PRICE_HISTORY = gql`
   }
 `;
 
+const GET_HISTORICAL_PERFORMANCE = gql`
+  query GetHistoricalPerformance($days: Int) {
+    historicalPerformance(days: $days) {
+      date
+      totalFundAllocationBaseline
+      totalFundAllocationOptimized
+      differential
+      differentialPercentage
+      totalInflows
+      totalOutflows
+      netFlow
+      chains {
+        chainName
+        apyBaseline
+        apyOptimized
+        allocationBaseline
+        allocationOptimized
+        utilizationRatio
+        totalSupply
+      }
+    }
+  }
+`;
+
 export interface PerformanceDataPoint {
   date: string;
   totalFundAllocationBaseline: string;
@@ -164,23 +188,38 @@ export function usePerformanceData() {
     }
   );
 
+  // Query historical performance data from backend
+  const { data: performanceResult, loading: performanceLoading, error: performanceError } = useQuery(
+    GET_HISTORICAL_PERFORMANCE,
+    {
+      variables: { days },
+      errorPolicy: 'all'
+    }
+  );
+
   // Process vault data
   const sharePriceHistory: SharePricePoint[] = sharePriceResult?.sharePriceHistory || [];
   const vaultData: VaultData | null = vaultResult?.vaultData || null;
   const chainData: ChainData[] = chainResult?.allChainData || [];
+  const backendPerformanceData: PerformanceDataPoint[] = performanceResult?.historicalPerformance || [];
 
-  // Generate performance comparison data - use vault data as base
+  // Generate performance comparison data - prefer backend data, fallback to vault data
   const performanceData: VaultPerformancePoint[] = (() => {
-    // Use vault data if available, even without historical share price data
-    const hasVaultData = vaultData && parseFloat(vaultData.totalAssets) > 0;
-    
-    if (!hasVaultData) {
-      // Return empty array if no vault data
-      return [];
+    // Priority 1: Use backend performance data if available
+    if (backendPerformanceData.length > 0) {
+      console.log('📊 Using backend performance data:', backendPerformanceData.length, 'days');
+      return backendPerformanceData.map(point => ({
+        date: point.date,
+        vaultSharePrice: parseFloat(point.totalFundAllocationOptimized),
+        baselineValue: parseFloat(point.totalFundAllocationBaseline),
+        differential: parseFloat(point.differential),
+        differentialPercentage: point.differentialPercentage
+      }));
     }
-    
-    // If we have real share price history, use it
+
+    // Priority 2: Use share price history if available
     if (sharePriceHistory.length > 0) {
+      console.log('📊 Using share price history:', sharePriceHistory.length, 'days');
       const baselineAPY = chainData.find(c => c.chainName === chainName)?.aavePool?.supplyAPY || 3.3;
       const dailyRate = baselineAPY / 100 / 365;
       
@@ -198,8 +237,18 @@ export function usePerformanceData() {
         };
       });
     }
+
+    // Priority 3: Check if we have vault data for fallback mock data
+    const hasVaultData = vaultData && parseFloat(vaultData.totalAssets) > 0;
     
-    // Generate mock performance data based on vault data
+    if (!hasVaultData) {
+      // No data at all - return empty array
+      console.log('⚠️ No performance data available');
+      return [];
+    }
+    
+    // Priority 4: Generate mock performance data based on vault data
+    console.log('⚠️ Using fallback mock data');
     const baselineAPY = 3.5; // Mock baseline APY
     const dailyRate = baselineAPY / 100 / 365;
     
@@ -310,8 +359,8 @@ export function usePerformanceData() {
     });
   }
 
-  const loading = sharePriceLoading || vaultLoading || chainLoading;
-  const error = sharePriceError || vaultError || chainError;
+  const loading = sharePriceLoading || vaultLoading || chainLoading || performanceLoading;
+  const error = sharePriceError || vaultError || chainError || performanceError;
 
 
 
