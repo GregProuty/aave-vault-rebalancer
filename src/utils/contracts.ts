@@ -2,8 +2,8 @@
 export const CONTRACT_ADDRESSES = {
   localhost: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788',
   ethereum: '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2', // AAVE V3 Pool on Ethereum mainnet
-  baseSepolia: '0x773035EABdA16B5416B26E12156483C6B6F56451', // AaveVault on Base Sepolia (CORRECT AI_AGENT)
-  arbitrumSepolia: '0xB5412604ea7E3EeC4043Bd8F1BE1D3aA357A6185', // AaveVault on Arbitrum Sepolia (CORRECT AI_AGENT)
+  baseSepolia: '0x773035EABdA16B5416B26E12156483C6B6F56451', // AaveVault on Base Sepolia (OLD - for reference)
+  arbitrumSepolia: '0xab686F6587345ccD11c353C0162743529E199edf', // NEW VAULT on Arbitrum Sepolia (agent: 0xEB72C74f...)
   optimismSepolia: '', // To be deployed
 } as const;
 
