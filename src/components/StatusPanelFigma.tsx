@@ -46,7 +46,7 @@ const StatusPanelFigma = () => {
           {primaryMessage.category === 'welcome-back' ? (
             <p>
               {WELCOME_BACK.PREFIX}
-              <span className="font-semibold text-green-400">{yieldEarned} {WELCOME_BACK.CURRENCY}</span>
+              {yieldEarned} {WELCOME_BACK.CURRENCY}
               {WELCOME_BACK.SUFFIX}
             </p>
           ) : primaryMessage.category === 'welcome' ? (

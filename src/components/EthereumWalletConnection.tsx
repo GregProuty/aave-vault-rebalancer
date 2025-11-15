@@ -90,7 +90,7 @@ export const EthereumWalletConnection: React.FC = () => {
                     <div>
                       <button
                         onClick={openAccountModal}
-                        className="w-full bg-gray2 border border-gray3 rounded-md px-4 py-2 transition-colors hover:bg-gray1"
+                        className="w-full bg-gray2 border border-gray3 rounded-md p-6 transition-colors hover:bg-gray1"
                       >
                         <div className="flex items-center justify-between">
                           {/* Left: wallet icon + short address */}

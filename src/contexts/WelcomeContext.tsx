@@ -113,20 +113,20 @@ export const WelcomeProvider: React.FC<WelcomeProviderProps> = ({ children }) =>
       return;
     }
 
-    // Calculate yield earned (simplified calculation)
-    if (vaultData?.vaultData?.performance24h && vaultShares) {
-      const performance = vaultData.vaultData.performance24h;
-      const sharePrice = vaultData.vaultData.sharePrice || 1;
-      const userShares = Number(vaultShares) / 1e6; // Convert from wei to USDC
-      const userValue = userShares * sharePrice;
-      const yieldAmount = userValue * (performance / 100); // Convert percentage to decimal
+    // Calculate lifetime yield earned
+    if (vaultShares) {
+      const sharePrice = vaultData?.vaultData?.sharePrice || 1;
+      const userShares = Number(vaultShares) / 1e6; // Convert from wei to USDC (6 decimals)
+      const currentValue = userShares * sharePrice;
+      const originalDeposit = userShares; // Assumes initial share price was ~1
+      const totalYield = Math.max(0, currentValue - originalDeposit);
       
-      setYieldEarned(Math.round(yieldAmount * 100) / 100); // Round to 2 decimals
+      setYieldEarned(Math.round(totalYield * 100) / 100); // Round to 2 decimals
       setShowWelcomeBack(true);
     } else {
-      // Show welcome back even without yield data
-      setYieldEarned(247); // Fallback value as shown in your image
-      setShowWelcomeBack(true);
+      // No shares, no yield
+      setYieldEarned(0);
+      setShowWelcomeBack(false);
     }
   }, [address, isConnected, hasDeposits, vaultData, vaultShares]);
 

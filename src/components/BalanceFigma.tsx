@@ -13,7 +13,7 @@ import { useDeposit } from '@/contexts/DepositContext';
 
 export const BalanceFigma = () => {
   const { address, isConnected, chainId, connector } = useAccount();
-  const { hasDeposits } = useWelcome();
+  const { hasDeposits, yieldEarned } = useWelcome();
   const { setTriggerDepositCallback } = useDeposit();
   const [currentState, setCurrentState] = useState<'balance' | 'deposit' | 'withdraw'>('balance');
   const [depositAmount, setDepositAmount] = useState('');
@@ -22,11 +22,30 @@ export const BalanceFigma = () => {
   const [withdrawStep, setWithdrawStep] = useState<'input' | 'withdrawing' | 'confirming' | 'error'>('input');
   const [errorMessage, setErrorMessage] = useState('');
   
+  // Check if tokens have been added to wallet (persisted in localStorage)
+  const getTokenAddedKey = () => `tokensAdded_${address}_${chainId}`;
+  const [tokensAddedToWallet, setTokensAddedToWallet] = useState(() => {
+    if (typeof window !== 'undefined' && address && chainId) {
+      return localStorage.getItem(getTokenAddedKey()) === 'true';
+    }
+    return false;
+  });
+  
   // Get performance data for APY, user's vault value, and totals
   const { currentApy, totalValue: userVaultValue } = usePerformanceData();
   
   // Transaction status context
   const { addMessage, upsertMessage, removeMessage, clearMessages } = useTransactionStatus();
+  
+  // Update tokensAddedToWallet state when address or chain changes
+  useEffect(() => {
+    if (address && chainId) {
+      const isAdded = localStorage.getItem(getTokenAddedKey()) === 'true';
+      setTokensAddedToWallet(isAdded);
+    } else {
+      setTokensAddedToWallet(false);
+    }
+  }, [address, chainId]);
   
   // Contract write hooks
   const { writeContract: writeVault, data: vaultTxHash, isPending: isVaultPending, error: vaultWriteError } = useWriteContract();
@@ -172,6 +191,11 @@ export const BalanceFigma = () => {
       });
       
       if (wasAdded) {
+        setTokensAddedToWallet(true);
+        // Persist to localStorage
+        if (typeof window !== 'undefined' && address && chainId) {
+          localStorage.setItem(getTokenAddedKey(), 'true');
+        }
         addMessage({
           type: 'success',
           message: 'AAVE-RB LP token successfully added to wallet!',
@@ -537,6 +561,13 @@ export const BalanceFigma = () => {
           <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
           
           <div className="font-display font-medium text-[40px] leading-[1.2]">{userDepositedFormatted}</div>
+          
+          {/* Lifetime Yield - Show if user has deposits */}
+          {hasDeposits && (
+            <div className="text-green-400 font-medium text-[24px] leading-[1.2]">
+              +{yieldEarned.toFixed(2)}
+            </div>
+          )}
         </div>
         
         <div className="text-gray-400 text-sm">
@@ -551,13 +582,15 @@ export const BalanceFigma = () => {
           <span className="text-sm font-medium">
             {vaultSharesFormatted} <span className="text-gray-400 text-xs font-normal">LP tokens</span>
           </span>
-          <button 
-            onClick={addTokenToWallet}
-            className="bg-gray2 text-primary text-xs border border-gray3 px-3 py-1.5 rounded-md hover:bg-gray1 transition-colors disabled:opacity-50"
-            disabled={!isConnected || !chainId}
-          >
-            Add to Wallet
-          </button>
+          {!tokensAddedToWallet && (
+            <button 
+              onClick={addTokenToWallet}
+              className="bg-gray2 text-primary text-xs border border-gray3 px-3 py-1.5 rounded-md hover:bg-gray1 transition-colors disabled:opacity-50"
+              disabled={!isConnected || !chainId}
+            >
+              Add to Wallet
+            </button>
+          )}
         </div>
       </div>
 
@@ -606,9 +639,9 @@ export const BalanceFigma = () => {
                 placeholder="0"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
-                className="w-full bg-gray-700 text-white py-2 px-4 rounded border border-gray-600 focus:outline-none focus:border-blue-500 pr-20 text-sm"
+                className="w-full bg-gray1 text-white p-4 rounded border border-gray4 focus:outline-none focus:border-blue-500 pr-20 text-base"
               />
-              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
                 <span className="text-gray-400 text-sm">USDC</span>
                 <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
               </div>
@@ -628,9 +661,8 @@ export const BalanceFigma = () => {
               variant="primary"
               onClick={handleInitiateDeposit}
               disabled={!depositAmount || !isConnected}
-              className="w-full"
             >
-              {depositAmount && hasEnoughAllowance(depositAmount) ? 'Deposit' : 'Approve & Deposit'}
+              {depositAmount && hasEnoughAllowance(depositAmount) ? 'Deposit' : 'Approve'}
             </Button>
           </div>
         </>
@@ -654,26 +686,26 @@ export const BalanceFigma = () => {
                 pattern="[0-9]*[.]?[0-9]*"
                 value={depositAmount}
                 disabled
-                className="w-full bg-gray-700 text-white py-2 px-4 rounded border border-gray-600 pr-20 text-sm"
+                className="w-full bg-gray1 text-white p-4 rounded border border-gray4 pr-20 text-base"
               />
-              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
                 <span className="text-gray-400 text-sm">USDC</span>
                 <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex gap-2">
             <button 
               onClick={handleCancel}
-              className="bg-gray-700 text-white py-2 px-4 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
+              className="bg-gray-700 text-white py-2 px-6 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
             >
               Cancel
             </button>
             <button 
               onClick={handleConfirmDeposit}
               disabled={isUSDCPending || isUSDCTxLoading}
-              className={`${(isUSDCPending || isUSDCTxLoading) ? 'bg-gray3 text-white border border-gray4' : 'bg-white text-black hover:bg-gray-100'} h-12 px-4 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 flex items-center justify-center w-full`}
+              className={`${(isUSDCPending || isUSDCTxLoading) ? 'bg-gray3 text-white border border-gray4' : 'bg-white text-black hover:bg-gray-100'} h-12 px-4 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 flex items-center justify-center flex-1`}
               aria-busy={isUSDCPending || isUSDCTxLoading}
             >
               {(isUSDCPending || isUSDCTxLoading) ? (
@@ -704,9 +736,9 @@ export const BalanceFigma = () => {
                 pattern="[0-9]*[.]?[0-9]*"
                 value={depositAmount}
                 disabled
-                className="w-full bg-gray-700 text-white py-2 px-4 rounded border border-gray-600 pr-20 text-sm"
+                className="w-full bg-gray1 text-white p-4 rounded border border-gray4 pr-20 text-base"
               />
-              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
                 <span className="text-gray-400 text-sm">USDC</span>
                 <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
               </div>
@@ -750,7 +782,7 @@ export const BalanceFigma = () => {
                 <span className="text-gray-300 text-sm">Previous</span>
                 <span className="text-gray-400 font-medium">{previousAmount.toFixed(2)} USDC</span>
               </div>
-              <div className="border-t border-gray-600 pt-3">
+              <div className="border-t border-gray3 pt-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-300 text-sm">Total</span>
                   <span className="text-white font-semibold">{currentTotal.toLocaleString()} USDC</span>
@@ -760,9 +792,10 @@ export const BalanceFigma = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex gap-3">
             <Button 
               variant="secondary"
+              className="px-6"
               onClick={() => {
                 if (vaultTxHash && chainId) {
                   const getBlockExplorerUrl = (chainId: number, txHash: string) => {
@@ -794,6 +827,7 @@ export const BalanceFigma = () => {
             </Button>
             <Button 
               variant="primary"
+              className="flex-1"
               onClick={() => {
                 setCurrentState('balance');
                 setDepositStep('input');
@@ -822,16 +856,16 @@ export const BalanceFigma = () => {
             <p className="text-white mb-2">Transaction Failed</p>
             <p className="text-gray-400 text-sm mb-6">{errorMessage}</p>
             
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex gap-2">
               <button 
                 onClick={handleCancel}
-                className="bg-gray-700 text-white py-2 px-4 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
+                className="bg-gray-700 text-white py-2 px-6 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleRetry}
-                className="bg-white text-black py-2 px-4 rounded font-medium hover:bg-gray-100 transition-colors text-sm"
+                className="bg-white text-black py-2 px-4 rounded font-medium hover:bg-gray-100 transition-colors text-sm flex-1"
               >
                 Try Again
               </button>
@@ -915,7 +949,7 @@ export const BalanceFigma = () => {
         <>
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
+            <h3 className="text-base font-medium text-white font-display">Withdraw</h3>
           </div>
           
           {/* Summary */}
@@ -929,7 +963,7 @@ export const BalanceFigma = () => {
                 <span className="text-gray-300 text-sm">Yield</span>
                 <span className="text-green-400 font-medium">{totalYield.toFixed(2)} USDC</span>
               </div>
-              <div className="border-t border-gray-600 pt-3">
+              <div className="border-t border-gray3 pt-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-300 text-sm">Total</span>
                   <span className="text-white font-semibold">{currentTotal.toFixed(2)} USDC</span>
@@ -948,7 +982,7 @@ export const BalanceFigma = () => {
                 placeholder="0"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                className="w-full bg-gray-700 text-white py-3 px-4 rounded border border-gray-600 focus:outline-none focus:border-blue-500 text-lg"
+                className="w-full bg-gray1 text-white p-4 rounded border border-gray4 focus:outline-none focus:border-blue-500 text-base"
               />
               <button
                 onClick={() => setWithdrawAmount(withdrawableAmount.toString())}
@@ -961,15 +995,17 @@ export const BalanceFigma = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex gap-3">
             <Button 
               variant="secondary" 
               onClick={handleCancel}
+              className="px-6"
             >
               Cancel
             </Button>
             <Button 
               variant="primary"
+              className="flex-1"
               onClick={handleWithdraw}
               disabled={!canWithdraw}
             >
@@ -993,7 +1029,7 @@ export const BalanceFigma = () => {
         <>
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
+            <h3 className="text-base font-medium text-white font-display">Withdraw</h3>
           </div>
           
           {/* Summary */}
@@ -1007,7 +1043,7 @@ export const BalanceFigma = () => {
                 <span className="text-gray-300 text-sm">Yield</span>
                 <span className="text-green-400 font-medium">{withdrawalYield.toFixed(2)} USDC</span>
               </div>
-              <div className="border-t border-gray-600 pt-3">
+              <div className="border-t border-gray3 pt-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-300 text-sm">Total</span>
                   <span className="text-white font-semibold">{withdrawalAmount.toFixed(2)} USDC</span>
@@ -1032,7 +1068,7 @@ export const BalanceFigma = () => {
         <>
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-medium text-white font-display">Withdraw</h3>
+            <h3 className="text-base font-medium text-white font-display">Withdraw</h3>
           </div>
           
           {/* Summary */}
@@ -1046,7 +1082,7 @@ export const BalanceFigma = () => {
                 <span className="text-gray-300 text-sm">Yield</span>
                 <span className="text-green-400 font-medium">{withdrawalYield.toFixed(2)} USDC</span>
               </div>
-              <div className="border-t border-gray-600 pt-3">
+              <div className="border-t border-gray3 pt-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-300 text-sm">Total</span>
                   <span className="text-white font-semibold">{withdrawalAmount.toFixed(2)} USDC</span>
@@ -1056,9 +1092,10 @@ export const BalanceFigma = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex gap-3">
             <Button 
               variant="secondary"
+              className="px-6"
               onClick={() => {
                 if (vaultTxHash && chainId) {
                   const getBlockExplorerUrl = (chainId: number, txHash: string) => {
@@ -1090,6 +1127,7 @@ export const BalanceFigma = () => {
             </Button>
             <Button 
               variant="primary"
+              className="flex-1"
               onClick={() => {
                 setCurrentState('balance');
                 setWithdrawStep('input');
@@ -1108,23 +1146,23 @@ export const BalanceFigma = () => {
     if (withdrawStep === 'error') {
       return (
     <>
-      <h3 className="text-xl font-medium mb-6 text-white font-display">Withdraw</h3>
+      <h3 className="text-base font-medium mb-6 text-white font-display">Withdraw</h3>
           
       <div className="text-center py-8">
             <div className="text-red-400 text-4xl mb-4">❌</div>
             <p className="text-white mb-2">Withdrawal Failed</p>
             <p className="text-gray-400 text-sm mb-4">{errorMessage}</p>
             
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex gap-2">
         <button 
           onClick={handleCancel}
-          className="bg-gray-700 text-white py-2 px-4 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
+          className="bg-gray-700 text-white py-2 px-6 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
         >
           Cancel
         </button>
               <button 
                 onClick={() => setWithdrawStep('input')}
-                className="bg-gray-800 text-white py-2 px-4 rounded font-medium hover:bg-gray-700 transition-colors text-sm"
+                className="bg-gray-800 text-white py-2 px-4 rounded font-medium hover:bg-gray-700 transition-colors text-sm flex-1"
               >
                 Try Again
               </button>
@@ -1140,18 +1178,11 @@ export const BalanceFigma = () => {
   return (
     <div className="text-primary w-full">
       {/* Balance Card Container - matches sidebar components spec */}
-      {(() => {
-        const isDepositBig = currentState === 'deposit' && (depositStep === 'confirming' || depositStep === 'error');
-        const isWithdrawBig = currentState === 'withdraw' && (withdrawStep === 'input' || withdrawStep === 'confirming' || withdrawStep === 'error');
-        const cardMinH = (isDepositBig || isWithdrawBig) ? 'min-h-80' : 'min-h-64';
-        return (
-          <div className={`bg-gray2 border border-gray3 rounded-md p-6 ${cardMinH}`}>
-            {currentState === 'balance' && renderBalanceState()}
-            {currentState === 'deposit' && renderDepositState()}
-            {currentState === 'withdraw' && renderWithdrawState()}
-          </div>
-        );
-      })()}
+      <div className="bg-gray2 border border-gray3 rounded-md p-6">
+        {currentState === 'balance' && renderBalanceState()}
+        {currentState === 'deposit' && renderDepositState()}
+        {currentState === 'withdraw' && renderWithdrawState()}
+      </div>
     </div>
   );
 };

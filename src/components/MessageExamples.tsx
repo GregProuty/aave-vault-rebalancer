@@ -10,7 +10,7 @@ export const MessageExamples = () => {
     <div className="space-y-4 p-4">
       {/* Welcome Back Message (Idle type) */}
       <IdleMessage category="welcome-back" id="welcome-back-example">
-        <p>Welcome back! You have earned <span className="font-semibold text-green-400">247 USDC</span> yield since last time.</p>
+        <p>Welcome back! You have earned 247 USDC yield since last time.</p>
       </IdleMessage>
 
       {/* Info Messages */}
