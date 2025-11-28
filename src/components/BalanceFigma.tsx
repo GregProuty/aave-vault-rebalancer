@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatUnits, parseUnits } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
-// import { getDepositSignature } from '@/utils/oracleClient'; // TEMPORARILY DISABLED
+import { getDepositSignature } from '@/utils/oracleClient';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
 import { Button } from '@/components/Button';
 import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
@@ -350,21 +350,6 @@ export const BalanceFigma = () => {
       
       const amountInWei = parseUnits(depositAmount, 6);
       
-      // 🚧 TEMPORARILY DISABLED: Oracle signature method
-      // TODO: Re-enable once NEAR contract is deployed with sign_digest method
-      console.log('⚠️ Using regular deposit method (oracle temporarily disabled)');
-      upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
-      
-      // Use regular deposit
-      await writeVault({
-        address: getContractAddress(chainId) as `0x${string}`,
-        abi: AAVE_VAULT_ABI,
-        functionName: 'deposit',
-        args: [amountInWei, address as `0x${string}`],
-        chainId,
-      });
-      
-      /* COMMENTED OUT - Oracle signature method
       upsertMessage('deposit-pending', { type: 'pending', message: 'Getting cross-chain signature...' });
       
       // Get signed balance snapshot from oracle
@@ -415,7 +400,6 @@ export const BalanceFigma = () => {
           chainId,
         });
       }
-      */
       
       // Transaction submitted successfully - the useEffect will handle the rest
       
