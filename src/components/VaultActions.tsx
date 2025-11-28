@@ -404,10 +404,10 @@ export const VaultActions: React.FC = () => {
       console.error('Deposit failed:', err);
       
       // Enhanced error handling for oracle-specific errors
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((err as any)?.message?.includes('Oracle') || 
-          (err as any)?.message?.includes('oracle') ||
-          (err as any)?.message?.includes('signature')) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('Oracle') || 
+          errorMessage.includes('oracle') ||
+          errorMessage.includes('signature')) {
         console.error('Oracle service error:', err);
       }
       
