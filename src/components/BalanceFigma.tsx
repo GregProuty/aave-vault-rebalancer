@@ -32,7 +32,7 @@ export const BalanceFigma = () => {
   });
   
   // Get performance data for APY, user's vault value, and totals
-  const { currentApy, totalValue: userVaultValue } = usePerformanceData();
+  const { currentApy, totalValue: userVaultValue, refetchVaultBalance } = usePerformanceData();
   
   // Transaction status context
   const { addMessage, upsertMessage, removeMessage, clearMessages } = useTransactionStatus();
@@ -284,7 +284,8 @@ export const BalanceFigma = () => {
         refetchVaultShares(),
         refetchTotalAssets(),
         refetchTotalSupply(),
-        refetchAllowance()
+        refetchAllowance(),
+        refetchVaultBalance() // Also refresh the usePerformanceData hook's data
       ]);
       console.log('All balances refreshed successfully');
     } catch (error) {

@@ -49,11 +49,11 @@ export const VaultActionsSimple = () => {
 
   // Calculate values
   const usdcBalanceFormatted = usdcBalance ? parseFloat(formatUnits(usdcBalance, 6)).toLocaleString() : '0';
-  const vaultSharesFormatted = vaultShares ? formatUnits(vaultShares, 18) : '0.0001';
+  const vaultSharesFormatted = vaultShares ? formatUnits(vaultShares, 6) : '0.0001';
   
-  // Calculate estimated share value
-  const shareValue = totalAssets && totalSupply && vaultShares 
-    ? (parseFloat(formatUnits(totalAssets, 6)) * parseFloat(formatUnits(vaultShares, 18))) / parseFloat(formatUnits(totalSupply, 18))
+  // Calculate estimated share value (shares use same decimals as underlying USDC = 6)
+  const shareValue = totalAssets && totalSupply && vaultShares
+    ? (parseFloat(formatUnits(totalAssets, 6)) * parseFloat(formatUnits(vaultShares, 6))) / parseFloat(formatUnits(totalSupply, 6))
     : 3;
 
   // Contract interactions

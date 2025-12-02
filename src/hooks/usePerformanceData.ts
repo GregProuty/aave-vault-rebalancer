@@ -140,7 +140,7 @@ export function usePerformanceData() {
   })() : null;
 
   // Read user's vault share balance
-  const { data: userShareBalance } = useReadContract({
+  const { data: userShareBalance, refetch: refetchUserShareBalance } = useReadContract({
     address: contractAddress as `0x${string}` | undefined,
     abi: AAVE_VAULT_ABI,
     functionName: 'balanceOf',
@@ -151,10 +151,20 @@ export function usePerformanceData() {
   });
 
   // Read total assets directly from contract for accurate calculation
-  const { data: contractTotalAssets } = useReadContract({
+  const { data: contractTotalAssets, refetch: refetchContractTotalAssets } = useReadContract({
     address: contractAddress as `0x${string}` | undefined,
     abi: AAVE_VAULT_ABI,
     functionName: 'totalAssets',
+    query: {
+      enabled: !!contractAddress,
+    },
+  });
+
+  // Read total supply for accurate share price calculation
+  const { data: contractTotalSupply, refetch: refetchContractTotalSupply } = useReadContract({
+    address: contractAddress as `0x${string}` | undefined,
+    abi: AAVE_VAULT_ABI,
+    functionName: 'totalSupply',
     query: {
       enabled: !!contractAddress,
     },
@@ -172,7 +182,7 @@ export function usePerformanceData() {
   );
 
   // Query current vault data
-  const { data: vaultResult, loading: vaultLoading, error: vaultError } = useQuery(
+  const { data: vaultResult, loading: vaultLoading, error: vaultError, refetch: refetchVaultData } = useQuery(
     GET_VAULT_DATA,
     {
       variables: { chainName },
@@ -280,43 +290,37 @@ export function usePerformanceData() {
   
   // Calculate user's personal vault value based on their shares
   // ERC4626 shares typically have the same decimals as the underlying asset (6 for USDC)
-  let userShares = userShareBalance ? Number(formatUnits(userShareBalance as bigint, 6)) : 0;
+  const userShares = userShareBalance ? Number(formatUnits(userShareBalance as bigint, 6)) : 0;
+  const totalAssetValue = contractTotalAssets ? Number(formatUnits(contractTotalAssets as bigint, 6)) : 0;
+  const totalSupplyValue = contractTotalSupply ? Number(formatUnits(contractTotalSupply as bigint, 6)) : 0;
   
-  // TEMPORARY FIX: Scale down inflated contract values
-  // Contract seems to return values inflated by ~1 billion factor
-  if (userShares > 1000000) { // If more than 1M USDC, likely inflated
-    userShares = userShares / 1000000000; // Scale down by 1 billion
-    console.log('🔧 Applied scaling fix to user shares:', userShares);
-  }
-  
-  // Calculate share price using the most reliable method
+  // Calculate user's vault value using on-chain data (most accurate)
+  // ERC4626 formula: userAssets = (userShares * totalAssets) / totalSupply
+  let userVaultValue = 0;
   let sharePrice = 1.0;
   
-  // Method 1: Use contract data (most reliable for current value)
-  if (contractTotalAssets && userShareBalance && userShareBalance > BigInt(0)) {
-    // For ERC4626 vaults, we can estimate share value
-    // This is a simplified calculation - real share price would need total supply
-    sharePrice = 1.0; // Default to 1:1 ratio, backend data will override if available
+  if (userShares > 0 && totalAssetValue > 0 && totalSupplyValue > 0) {
+    // Calculate from on-chain data - this is the source of truth
+    userVaultValue = (userShares * totalAssetValue) / totalSupplyValue;
+    sharePrice = totalAssetValue / totalSupplyValue;
+    console.log('💰 On-chain vault value:', userVaultValue, 'USDC (', userShares, 'shares,', totalAssetValue, 'totalAssets,', totalSupplyValue, 'totalSupply)');
+  } else if (userShares > 0) {
+    // Fallback: assume 1:1 ratio for new vaults or when data is loading
+    userVaultValue = userShares;
+    console.log('💰 Fallback vault value (1:1):', userVaultValue, 'USDC');
   }
   
-  // Method 2: Use backend calculated share price if available
-  if (vaultData && vaultData.sharePrice && vaultData.sharePrice > 0) {
-    sharePrice = vaultData.sharePrice;
-  }
+  // Only use backend/historical data for charting, NOT for user balance display
+  // The sharePrice from backend is for performance tracking, not current value
   
-  // Method 3: Use historical data
-  if (latestPoint?.vaultSharePrice && latestPoint.vaultSharePrice > 0) {
-    sharePrice = latestPoint.vaultSharePrice;
-  }
-  
-  const userVaultValue = userShares * sharePrice; // User's personal vault value
-  
-  // Total vault value from backend or on-chain fallback
+  // Total vault value - prioritize on-chain data for accuracy
   let totalVaultValue = 0;
-  if (vaultData && vaultData.totalAssets) {
-    totalVaultValue = parseFloat(vaultData.totalAssets);
-  } else if (contractTotalAssets) {
+  if (contractTotalAssets) {
+    // On-chain is source of truth
     totalVaultValue = Number(formatUnits(contractTotalAssets as bigint, 6));
+  } else if (vaultData && vaultData.totalAssets) {
+    // Fallback to backend if contract data not available
+    totalVaultValue = parseFloat(vaultData.totalAssets);
   }
   
   // Gains
@@ -362,7 +366,17 @@ export function usePerformanceData() {
   const loading = sharePriceLoading || vaultLoading || chainLoading || performanceLoading;
   const error = sharePriceError || vaultError || chainError || performanceError;
 
-
+  // Combined refetch function to refresh all vault-related data
+  const refetchVaultBalance = async () => {
+    console.log('🔄 Refetching vault balance data...');
+    await Promise.all([
+      refetchUserShareBalance(),
+      refetchContractTotalAssets(),
+      refetchContractTotalSupply(),
+      refetchVaultData()
+    ]);
+    console.log('✅ Vault balance data refreshed');
+  };
 
   return {
     // Legacy data format (for backward compatibility)
@@ -393,6 +407,9 @@ export function usePerformanceData() {
     
     // Controls
     days,
-    chainName
+    chainName,
+    
+    // Refetch function for manual refresh after deposits/withdrawals
+    refetchVaultBalance
   };
 } 
