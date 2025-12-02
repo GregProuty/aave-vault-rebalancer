@@ -21,6 +21,34 @@ export const BalanceFigma = () => {
   const [depositStep, setDepositStep] = useState<'input' | 'approving' | 'depositing' | 'confirming' | 'error'>('input');
   const [withdrawStep, setWithdrawStep] = useState<'input' | 'withdrawing' | 'confirming' | 'error'>('input');
   const [errorMessage, setErrorMessage] = useState('');
+  const [depositValidationError, setDepositValidationError] = useState('');
+  const [withdrawValidationError, setWithdrawValidationError] = useState('');
+  
+  // Validate and sanitize amount input - only allow valid decimal numbers
+  const sanitizeAmountInput = (value: string): string => {
+    // Remove any non-numeric characters except decimal point
+    let sanitized = value.replace(/[^0-9.]/g, '');
+    
+    // Only allow one decimal point
+    const parts = sanitized.split('.');
+    if (parts.length > 2) {
+      sanitized = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // Limit to 6 decimal places (USDC decimals)
+    if (parts.length === 2 && parts[1].length > 6) {
+      sanitized = parts[0] + '.' + parts[1].slice(0, 6);
+    }
+    
+    return sanitized;
+  };
+  
+  // Check if a string is a valid positive number
+  const isValidAmount = (value: string): boolean => {
+    if (!value || value === '' || value === '.') return false;
+    const num = parseFloat(value);
+    return !isNaN(num) && num > 0 && isFinite(num);
+  };
   
   // Check if tokens have been added to wallet (persisted in localStorage)
   const getTokenAddedKey = () => `tokensAdded_${address}_${chainId}`;
@@ -123,9 +151,13 @@ export const BalanceFigma = () => {
 
   // Check if user has sufficient allowance for the deposit amount
   const hasEnoughAllowance = (amount: string) => {
-    if (!usdcAllowance || !amount) return false;
-    const depositAmountInWei = parseUnits(amount, 6);
-    return usdcAllowance >= depositAmountInWei;
+    if (!usdcAllowance || !amount || !isValidAmount(amount)) return false;
+    try {
+      const depositAmountInWei = parseUnits(amount, 6);
+      return usdcAllowance >= depositAmountInWei;
+    } catch {
+      return false;
+    }
   };
 
   // Add LP token to wallet function
@@ -262,6 +294,8 @@ export const BalanceFigma = () => {
     setDepositAmount('');
     setWithdrawAmount('');
     setErrorMessage('');
+    setDepositValidationError('');
+    setWithdrawValidationError('');
     // Refresh balances when returning to balance view in case any transactions completed
     refreshAllBalances();
   };
@@ -295,7 +329,13 @@ export const BalanceFigma = () => {
 
   // Deposit flow functions
   const handleApproveUSDC = async () => {
-    if (!address || !chainId) return;
+    if (!address || !chainId || !depositAmount) return;
+    
+    // Final validation check before proceeding
+    if (!isValidAmount(depositAmount)) {
+      setDepositValidationError('Please enter a valid amount');
+      return;
+    }
     
     resetErrors();
     setDepositStep('approving');
@@ -343,6 +383,12 @@ export const BalanceFigma = () => {
   const handleConfirmDeposit = async () => {
     if (!address || !chainId || !depositAmount) return;
     
+    // Final validation check before proceeding
+    if (!isValidAmount(depositAmount)) {
+      setDepositValidationError('Please enter a valid amount');
+      return;
+    }
+    
     resetErrors();
     setDepositStep('depositing');
     
@@ -381,25 +427,40 @@ export const BalanceFigma = () => {
         console.log('🔐 Using deposit with signature (cross-chain assets: ' + snapshot.balance + ')');
         upsertMessage('deposit-pending', { type: 'pending', message: 'Deposit with signature in progress...' });
         
-        // Call depositWithExtraInfoViaSignature with the signed snapshot
-        await writeVault({
-          address: getContractAddress(chainId) as `0x${string}`,
-          abi: AAVE_VAULT_ABI,
-          functionName: 'depositWithExtraInfoViaSignature',
-          args: [
-            amountInWei,
-            address as `0x${string}`,
-            {
-              balance: BigInt(snapshot.balance),
-              nonce: BigInt(snapshot.nonce),
-              deadline: BigInt(snapshot.deadline),
-              assets: BigInt(snapshot.assets),
-              receiver: snapshot.receiver as `0x${string}`,
-            },
-            snapshot.signature as `0x${string}`,
-          ],
-          chainId,
-        });
+        try {
+          // Call depositWithExtraInfoViaSignature with the signed snapshot
+          await writeVault({
+            address: getContractAddress(chainId) as `0x${string}`,
+            abi: AAVE_VAULT_ABI,
+            functionName: 'depositWithExtraInfoViaSignature',
+            args: [
+              amountInWei,
+              address as `0x${string}`,
+              {
+                balance: BigInt(snapshot.balance),
+                nonce: BigInt(snapshot.nonce),
+                deadline: BigInt(snapshot.deadline),
+                assets: BigInt(snapshot.assets),
+                receiver: snapshot.receiver as `0x${string}`,
+              },
+              snapshot.signature as `0x${string}`,
+            ],
+            chainId,
+            gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
+          });
+        } catch (signatureError) {
+          // If signature deposit fails, try regular deposit as fallback
+          console.warn('⚠️ Signature deposit failed, trying regular deposit:', signatureError);
+          upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
+          
+          await writeVault({
+            address: getContractAddress(chainId) as `0x${string}`,
+            abi: AAVE_VAULT_ABI,
+            functionName: 'deposit',
+            args: [amountInWei, address as `0x${string}`],
+            chainId,
+          });
+        }
       }
       
       // Transaction submitted successfully - the useEffect will handle the rest
@@ -518,19 +579,78 @@ export const BalanceFigma = () => {
     }
   }, [isUSDCTxSuccess, isVaultTxSuccess, isUSDCTxError, isVaultTxError, usdcWriteError, vaultWriteError, depositStep, withdrawStep]);
 
-  // If user cancels in wallet, clear loading states gracefully
+  // If user cancels in wallet or transaction fails, show appropriate error
   useEffect(() => {
+    const isUserRejection = (error: Error | null) => {
+      if (!error) return false;
+      const msg = error.message?.toLowerCase() || '';
+      return msg.includes('user rejected') || 
+             msg.includes('rejected') || 
+             msg.includes('denied') ||
+             msg.includes('cancelled') ||
+             msg.includes('canceled');
+    };
+
+    // Extract a clean, user-friendly error message
+    const getCleanErrorMessage = (error: Error, action: string): string => {
+      const msg = error.message || '';
+      
+      // Check for common contract errors
+      if (msg.includes('insufficient funds')) {
+        return 'Insufficient funds for gas fees.';
+      }
+      if (msg.includes('SignatureExpired')) {
+        return 'Signature expired. Please try again.';
+      }
+      if (msg.includes('InvalidSignature')) {
+        return 'Invalid signature from oracle. Please try again.';
+      }
+      if (msg.includes('InvalidAmount')) {
+        return 'Invalid amount. Please check your input.';
+      }
+      if (msg.includes('reverted')) {
+        // Extract just the revert reason if possible
+        const revertMatch = msg.match(/reverted with the following reason:\s*([^.]+)/);
+        if (revertMatch) {
+          return `${action} failed: ${revertMatch[1].slice(0, 100)}`;
+        }
+        return `${action} failed: Transaction reverted. Please try again.`;
+      }
+      
+      // Truncate long messages
+      const cleanMsg = msg.split('Contract Call:')[0].trim();
+      if (cleanMsg.length > 150) {
+        return cleanMsg.slice(0, 150) + '...';
+      }
+      return cleanMsg || `${action} failed. Please try again.`;
+    };
+
     if (usdcWriteError && depositStep === 'approving') {
       setDepositStep('error');
-      setErrorMessage('Approval was cancelled in wallet.');
+      if (isUserRejection(usdcWriteError)) {
+        setErrorMessage('Approval was cancelled in wallet.');
+      } else {
+        console.error('Approval error:', usdcWriteError);
+        setErrorMessage(getCleanErrorMessage(usdcWriteError, 'Approval'));
+      }
     }
     if (vaultWriteError && depositStep === 'depositing') {
       setDepositStep('error');
-      setErrorMessage('Deposit was cancelled in wallet.');
+      if (isUserRejection(vaultWriteError)) {
+        setErrorMessage('Deposit was cancelled in wallet.');
+      } else {
+        console.error('Deposit error:', vaultWriteError);
+        setErrorMessage(getCleanErrorMessage(vaultWriteError, 'Deposit'));
+      }
     }
     if (vaultWriteError && withdrawStep === 'withdrawing') {
       setWithdrawStep('error');
-      setErrorMessage('Withdrawal was cancelled in wallet.');
+      if (isUserRejection(vaultWriteError)) {
+        setErrorMessage('Withdrawal was cancelled in wallet.');
+      } else {
+        console.error('Withdrawal error:', vaultWriteError);
+        setErrorMessage(getCleanErrorMessage(vaultWriteError, 'Withdrawal'));
+      }
     }
   }, [usdcWriteError, vaultWriteError, depositStep, withdrawStep]);
 
@@ -620,17 +740,30 @@ export const BalanceFigma = () => {
               <input
                 type="text"
                 inputMode="decimal"
-                pattern="[0-9]*[.]?[0-9]*"
                 placeholder="0"
                 value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                className="w-full bg-gray1 text-white p-4 rounded border border-gray4 focus:outline-none focus:border-blue-500 pr-20 text-base"
+                onChange={(e) => {
+                  const sanitized = sanitizeAmountInput(e.target.value);
+                  setDepositAmount(sanitized);
+                  // Clear validation error when user starts typing
+                  if (depositValidationError) setDepositValidationError('');
+                }}
+                onBlur={() => {
+                  // Validate on blur
+                  if (depositAmount && !isValidAmount(depositAmount)) {
+                    setDepositValidationError('Please enter a valid amount');
+                  }
+                }}
+                className={`w-full bg-gray1 text-white p-4 rounded border ${depositValidationError ? 'border-red-500' : 'border-gray4'} focus:outline-none focus:border-blue-500 pr-20 text-base`}
               />
               <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
                 <span className="text-gray-400 text-sm">USDC</span>
                 <img src="/usdc-icon.svg" alt="USDC" className="w-6 h-6" />
               </div>
             </div>
+            {depositValidationError && (
+              <p className="text-red-400 text-sm mt-1">{depositValidationError}</p>
+            )}
           </div>
 
           {/* Action Buttons - Cancel and Confirm */}
@@ -645,9 +778,9 @@ export const BalanceFigma = () => {
             <Button 
               variant="primary"
               onClick={handleInitiateDeposit}
-              disabled={!depositAmount || !isConnected}
+              disabled={!depositAmount || !isConnected || !isValidAmount(depositAmount) || !!depositValidationError}
             >
-              {depositAmount && hasEnoughAllowance(depositAmount) ? 'Deposit' : 'Approve'}
+              {depositAmount && isValidAmount(depositAmount) && hasEnoughAllowance(depositAmount) ? 'Deposit' : 'Approve'}
             </Button>
           </div>
         </>
@@ -829,6 +962,11 @@ export const BalanceFigma = () => {
 
     // Error step - transaction failed or was rejected
     if (depositStep === 'error') {
+      // Truncate error message for display
+      const displayError = errorMessage.length > 150 
+        ? errorMessage.slice(0, 150) + '...' 
+        : errorMessage;
+      
       return (
         <>
           {/* Header */}
@@ -839,7 +977,7 @@ export const BalanceFigma = () => {
           <div className="text-center py-8">
             <div className="text-red-400 text-4xl mb-4">❌</div>
             <p className="text-white mb-2">Transaction Failed</p>
-            <p className="text-gray-400 text-sm mb-6">{errorMessage}</p>
+            <p className="text-gray-400 text-sm mb-6 break-words max-w-full overflow-hidden">{displayError}</p>
             
             <div className="flex gap-2">
               <button 
@@ -864,25 +1002,34 @@ export const BalanceFigma = () => {
   };
 
   // Calculate withdrawable amount using accurate performance data
-  const withdrawableAmount = userVaultValue; // User's deposited funds available
+  const withdrawableAmount = userVaultValue || 0; // User's deposited funds available
   
-  const isWithdrawAmountValid = withdrawAmount && parseFloat(withdrawAmount) > 0;
-  const hasEnoughWithdrawBalance = withdrawableAmount && parseFloat(withdrawAmount) <= withdrawableAmount;
-  const canWithdraw = isWithdrawAmountValid && hasEnoughWithdrawBalance && !isVaultPending;
+  const isWithdrawAmountValid = withdrawAmount && isValidAmount(withdrawAmount);
+  const hasEnoughWithdrawBalance = withdrawableAmount > 0 && isValidAmount(withdrawAmount) && parseFloat(withdrawAmount) <= withdrawableAmount;
+  const canWithdraw = isWithdrawAmountValid && hasEnoughWithdrawBalance && !isVaultPending && !withdrawValidationError;
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || !chainId || !address || !canWithdraw) return;
+    
+    // Final validation check before proceeding
+    if (!isValidAmount(withdrawAmount)) {
+      setWithdrawValidationError('Please enter a valid amount');
+      return;
+    }
     
     try {
       setWithdrawStep('withdrawing');
       console.log('💳 Starting withdrawal:', withdrawAmount, 'USDC');
       
+      const amountInWei = parseUnits(withdrawAmount, 6);
+      
       await writeVault({
         address: getContractAddress(chainId) as `0x${string}`,
         abi: AAVE_VAULT_ABI,
         functionName: 'withdraw',
-        args: [parseUnits(withdrawAmount, 6), address, address],
+        args: [amountInWei, address, address],
         chainId,
+        gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
       });
       
       console.log('📝 Withdrawal transaction submitted, waiting for confirmation...');
@@ -963,20 +1110,35 @@ export const BalanceFigma = () => {
               <input
                 type="text"
                 inputMode="decimal"
-                pattern="[0-9]*[.]?[0-9]*"
                 placeholder="0"
                 value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                className="w-full bg-gray1 text-white p-4 rounded border border-gray4 focus:outline-none focus:border-blue-500 text-base"
+                onChange={(e) => {
+                  const sanitized = sanitizeAmountInput(e.target.value);
+                  setWithdrawAmount(sanitized);
+                  // Clear validation error when user starts typing
+                  if (withdrawValidationError) setWithdrawValidationError('');
+                }}
+                onBlur={() => {
+                  // Validate on blur
+                  if (withdrawAmount && !isValidAmount(withdrawAmount)) {
+                    setWithdrawValidationError('Please enter a valid amount');
+                  }
+                }}
+                className={`w-full bg-gray1 text-white p-4 rounded border ${withdrawValidationError ? 'border-red-500' : 'border-gray4'} focus:outline-none focus:border-blue-500 text-base`}
               />
               <button
-                onClick={() => setWithdrawAmount(withdrawableAmount.toString())}
+                onClick={() => {
+                  setWithdrawAmount(withdrawableAmount.toFixed(6));
+                  setWithdrawValidationError('');
+                }}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-400 text-sm hover:text-blue-300"
               >
                 Max
               </button>
             </div>
-            {/* Available line removed per design */}
+            {withdrawValidationError && (
+              <p className="text-red-400 text-sm mt-1">{withdrawValidationError}</p>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -1129,22 +1291,27 @@ export const BalanceFigma = () => {
 
     // Error step - transaction failed or was rejected
     if (withdrawStep === 'error') {
+      // Truncate error message for display
+      const displayError = errorMessage.length > 150 
+        ? errorMessage.slice(0, 150) + '...' 
+        : errorMessage;
+      
       return (
-    <>
-      <h3 className="text-base font-medium mb-6 text-white font-display">Withdraw</h3>
+        <>
+          <h3 className="text-base font-medium mb-6 text-white font-display">Withdraw</h3>
           
-      <div className="text-center py-8">
+          <div className="text-center py-8">
             <div className="text-red-400 text-4xl mb-4">❌</div>
             <p className="text-white mb-2">Withdrawal Failed</p>
-            <p className="text-gray-400 text-sm mb-4">{errorMessage}</p>
+            <p className="text-gray-400 text-sm mb-4 break-words max-w-full overflow-hidden">{displayError}</p>
             
             <div className="flex gap-2">
-        <button 
-          onClick={handleCancel}
-          className="bg-gray-700 text-white py-2 px-6 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
-        >
-          Cancel
-        </button>
+              <button 
+                onClick={handleCancel}
+                className="bg-gray-700 text-white py-2 px-6 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
+              >
+                Cancel
+              </button>
               <button 
                 onClick={() => setWithdrawStep('input')}
                 className="bg-gray-800 text-white py-2 px-4 rounded font-medium hover:bg-gray-700 transition-colors text-sm flex-1"
@@ -1152,9 +1319,9 @@ export const BalanceFigma = () => {
                 Try Again
               </button>
             </div>
-      </div>
-    </>
-  );
+          </div>
+        </>
+      );
     }
 
     return null;
