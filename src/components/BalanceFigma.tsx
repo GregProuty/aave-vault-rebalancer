@@ -351,6 +351,7 @@ export const BalanceFigma = () => {
         functionName: 'approve',
         args: [getContractAddress(chainId) as `0x${string}`, maxAmount],
         chainId,
+        gas: BigInt(100000), // Explicit gas limit - bypasses broken estimation
       });
       
       // Transaction submitted successfully - the useEffect will handle the rest
