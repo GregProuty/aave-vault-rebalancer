@@ -19,7 +19,7 @@ async function sendRawTransaction(params: {
   gas: string;
   chainId: number;
 }): Promise<string> {
-  console.log('🚀 [BUILD v5.0] sendRawTransaction called with:', params);
+  console.log('🚀 [BUILD v5.1] sendRawTransaction called with:', params);
   
   // Get ethereum provider
   const ethereum = (window as unknown as { ethereum?: { request: (args: { method: string; params: unknown[] }) => Promise<string> } }).ethereum;
@@ -38,7 +38,7 @@ async function sendRawTransaction(params: {
     }],
   });
   
-  console.log('🚀 [BUILD v5.0] Transaction sent successfully:', txHash);
+  console.log('🚀 [BUILD v5.1] Transaction sent successfully:', txHash);
   return txHash;
 }
 
@@ -375,17 +375,30 @@ export const BalanceFigma = () => {
       upsertMessage('deposit-approving', { type: 'pending', message: 'Approving spending limit...' });
       // Approve maximum amount (type(uint256).max) for unlimited spending
       const maxAmount = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+      const gasHex = toHex(100000);
       
-      await writeUSDC({
-        address: getUSDCAddress(chainId) as `0x${string}`,
+      // Use raw eth_sendTransaction - bypasses wagmi/viem layers that cause MetaMask simulation failures
+      console.log('🚀 [BUILD v5.1] sendRawTransaction for approve');
+      const approveCalldata = encodeFunctionData({
         abi: ERC20_ABI,
         functionName: 'approve',
         args: [getContractAddress(chainId) as `0x${string}`, maxAmount],
-        chainId,
-        gas: BigInt(100000), // Explicit gas limit - bypasses broken estimation
       });
       
-      // Transaction submitted successfully - the useEffect will handle the rest
+      const txHash = await sendRawTransaction({
+        from: address,
+        to: getUSDCAddress(chainId) as string,
+        data: approveCalldata,
+        gas: gasHex,
+        chainId,
+      });
+      
+      console.log('🚀 [BUILD v5.1] Approval submitted, hash:', txHash);
+      upsertMessage('deposit-approving', { type: 'success', message: 'Approval successful! Proceeding with deposit...', txHash: txHash as `0x${string}`, chainId });
+      
+      // Proceed with deposit after approval
+      refetchAllowance();
+      handleConfirmDeposit();
       
     } catch (error: unknown) {
       console.error('Approval failed:', error);
@@ -445,8 +458,8 @@ export const BalanceFigma = () => {
       const gasHex = toHex(350000); // Convert gas to hex for raw eth_sendTransaction
       
       if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
-        console.log('🚀 [BUILD v5.0] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.0] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.1] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.1] Gas limit (hex):', gasHex);
         upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
         
         // Use raw eth_sendTransaction - bypasses ALL wagmi/viem layers
@@ -463,7 +476,7 @@ export const BalanceFigma = () => {
           gas: gasHex,
           chainId,
         });
-        console.log('🚀 [BUILD v5.0] Raw transaction submitted successfully, hash:', txHash);
+        console.log('🚀 [BUILD v5.1] Raw transaction submitted successfully, hash:', txHash);
         // Raw transaction submitted - show success
         setDepositStep('confirming');
         removeMessage('deposit-pending');
@@ -472,9 +485,9 @@ export const BalanceFigma = () => {
         return; // Exit early, success handled
         
       } else {
-        console.log('🚀 [BUILD v5.0] Using deposit with signature via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.0] Gas limit (hex):', gasHex);
-        console.log('🚀 [BUILD v5.0] Snapshot:', JSON.stringify({
+        console.log('🚀 [BUILD v5.1] Using deposit with signature via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.1] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.1] Snapshot:', JSON.stringify({
           balance: snapshot.balance,
           nonce: snapshot.nonce,
           deadline: snapshot.deadline,
@@ -509,7 +522,7 @@ export const BalanceFigma = () => {
             gas: gasHex,
             chainId,
           });
-          console.log('🚀 [BUILD v5.0] Raw transaction submitted successfully, hash:', txHash);
+          console.log('🚀 [BUILD v5.1] Raw transaction submitted successfully, hash:', txHash);
           // Raw transaction submitted - show success (user can track in wallet)
           setDepositStep('confirming');
           removeMessage('deposit-pending');
@@ -518,7 +531,7 @@ export const BalanceFigma = () => {
           return; // Exit early, success handled
         } catch (signatureError) {
           // If signature deposit fails, try regular deposit as fallback
-          console.warn('🚀 [BUILD v5.0] Signature deposit failed, trying regular deposit:', signatureError);
+          console.warn('🚀 [BUILD v5.1] Signature deposit failed, trying regular deposit:', signatureError);
           upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
           
           const fallbackCalldata = encodeFunctionData({
@@ -534,7 +547,7 @@ export const BalanceFigma = () => {
             gas: gasHex,
             chainId,
           });
-          console.log('🚀 [BUILD v5.0] Fallback raw transaction submitted successfully, hash:', txHash);
+          console.log('🚀 [BUILD v5.1] Fallback raw transaction submitted successfully, hash:', txHash);
           // Raw transaction submitted - show success
           setDepositStep('confirming');
           removeMessage('deposit-pending');
@@ -1101,21 +1114,38 @@ export const BalanceFigma = () => {
     
     try {
       setWithdrawStep('withdrawing');
-      console.log('💳 Starting withdrawal:', withdrawAmount, 'USDC');
+      console.log('💳 [BUILD v5.1] Starting withdrawal:', withdrawAmount, 'USDC');
       
       const amountInWei = parseUnits(withdrawAmount, 6);
+      const gasHex = toHex(350000);
       
-      await writeVault({
-        address: getContractAddress(chainId) as `0x${string}`,
+      // Use raw eth_sendTransaction - bypasses wagmi/viem layers that cause MetaMask simulation failures
+      const withdrawCalldata = encodeFunctionData({
         abi: AAVE_VAULT_ABI,
         functionName: 'withdraw',
-        args: [amountInWei, address, address],
-        chainId,
-        gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
+        args: [amountInWei, address as `0x${string}`, address as `0x${string}`],
       });
       
-      console.log('📝 Withdrawal transaction submitted, waiting for confirmation...');
-      // Transaction submitted successfully - the useEffect will handle the rest
+      console.log('🚀 [BUILD v5.1] sendRawTransaction for withdraw');
+      const txHash = await sendRawTransaction({
+        from: address,
+        to: getContractAddress(chainId) as string,
+        data: withdrawCalldata,
+        gas: gasHex,
+        chainId,
+      });
+      
+      console.log('🚀 [BUILD v5.1] Withdrawal submitted, hash:', txHash);
+      
+      // Show success
+      setWithdrawStep('confirming');
+      addMessage({
+        type: 'success',
+        message: `Withdrawal of ${withdrawAmount} USDC submitted!`,
+        txHash: txHash as `0x${string}`,
+        chainId
+      });
+      refreshAllBalances();
       
     } catch (error: unknown) {
       console.error('Withdrawal failed:', error);
