@@ -106,9 +106,12 @@ export const BalanceFigma = () => {
     }
   }, [address, chainId]);
   
-  // Contract write hooks
-  const { writeContract: writeVault, data: vaultTxHash, isPending: isVaultPending, error: vaultWriteError } = useWriteContract();
-  const { writeContract: writeUSDC, data: usdcTxHash, isPending: isUSDCPending, error: usdcWriteError } = useWriteContract();
+  // Contract write hooks (writeContract functions unused - we use sendRawTransaction instead)
+  const { writeContract: _writeVault, data: vaultTxHash, isPending: isVaultPending, error: vaultWriteError } = useWriteContract();
+  const { writeContract: _writeUSDC, data: usdcTxHash, isPending: isUSDCPending, error: usdcWriteError } = useWriteContract();
+  // Suppress unused variable warnings
+  void _writeVault;
+  void _writeUSDC;
   
   // Transaction receipt hooks
   const { isSuccess: isVaultTxSuccess, isError: isVaultTxError } = useWaitForTransactionReceipt({ hash: vaultTxHash, chainId });
