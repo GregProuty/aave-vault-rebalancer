@@ -25,13 +25,13 @@ async function sendRawTransaction(params: {
   chainId: number;
   provider?: EthereumProvider; // Use connected wallet's provider if available
 }): Promise<string> {
-  console.log('🚀 [BUILD v5.3] sendRawTransaction called with:', { ...params, provider: params.provider ? '[provider]' : undefined });
+  console.log('🚀 [BUILD v5.4] sendRawTransaction called with:', { ...params, provider: params.provider ? '[provider]' : undefined });
   
   // Use provided provider (from connected wallet) or fall back to window.ethereum
   let ethereum: EthereumProvider | undefined = params.provider;
   
   if (!ethereum) {
-    console.log('⚠️ [BUILD v5.3] No provider passed, falling back to window.ethereum');
+    console.log('⚠️ [BUILD v5.4] No provider passed, falling back to window.ethereum');
     ethereum = (window as unknown as { ethereum?: EthereumProvider }).ethereum;
   }
   
@@ -39,18 +39,25 @@ async function sendRawTransaction(params: {
     throw new Error('No ethereum provider found. Please connect your wallet.');
   }
   
-  // Send transaction through the connected wallet
+  // Convert chainId to hex format
+  const chainIdHex = `0x${params.chainId.toString(16)}`;
+  
+  // Send transaction through the connected wallet with all explicit parameters
+  // Adding value, chainId helps MetaMask's simulation succeed
+  console.log('🚀 [BUILD v5.4] Sending with explicit params - chainId:', chainIdHex, 'gas:', params.gas);
   const txHash = await ethereum.request({
     method: 'eth_sendTransaction',
     params: [{
       from: params.from,
       to: params.to,
       data: params.data,
-      gas: params.gas, // Already hex formatted
+      gas: params.gas,           // Already hex formatted
+      value: '0x0',              // Explicit zero value - helps MetaMask simulation
+      chainId: chainIdHex,       // Explicit chainId - ensures correct chain simulation
     }],
   });
   
-  console.log('🚀 [BUILD v5.3] Transaction sent successfully:', txHash);
+  console.log('🚀 [BUILD v5.4] Transaction sent successfully:', txHash);
   return txHash;
 }
 
@@ -70,15 +77,15 @@ export const BalanceFigma = () => {
   // Get the provider from the connected wallet (fixes issue with multiple wallets)
   const getWalletProvider = useCallback(async (): Promise<EthereumProvider | undefined> => {
     if (!connector) {
-      console.log('⚠️ [BUILD v5.3] No connector available');
+      console.log('⚠️ [BUILD v5.4] No connector available');
       return undefined;
     }
     try {
       const provider = await connector.getProvider();
-      console.log('✅ [BUILD v5.3] Got provider from connector:', connector.name);
+      console.log('✅ [BUILD v5.4] Got provider from connector:', connector.name);
       return provider as EthereumProvider;
     } catch (error) {
-      console.error('⚠️ [BUILD v5.3] Failed to get provider from connector:', error);
+      console.error('⚠️ [BUILD v5.4] Failed to get provider from connector:', error);
       return undefined;
     }
   }, [connector]);
@@ -391,14 +398,14 @@ export const BalanceFigma = () => {
 
   // Poll for balance updates after transaction (waits for on-chain confirmation)
   const pollForBalanceUpdate = useCallback(async (txType: string) => {
-    console.log(`🔄 [BUILD v5.3] Starting balance polling after ${txType}...`);
+    console.log(`🔄 [BUILD v5.4] Starting balance polling after ${txType}...`);
     // Poll every 2 seconds for up to 20 seconds (10 attempts)
     for (let i = 0; i < 10; i++) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       await refreshAllBalances();
-      console.log(`🔄 [BUILD v5.3] Balance refresh attempt ${i + 1}/10 after ${txType}`);
+      console.log(`🔄 [BUILD v5.4] Balance refresh attempt ${i + 1}/10 after ${txType}`);
     }
-    console.log(`✅ [BUILD v5.3] Balance polling complete for ${txType}`);
+    console.log(`✅ [BUILD v5.4] Balance polling complete for ${txType}`);
   }, [refetchUSDCBalance, refetchVaultShares, refetchTotalAssets, refetchTotalSupply, refetchAllowance, refetchVaultBalance]);
 
   // Deposit flow functions
@@ -423,7 +430,7 @@ export const BalanceFigma = () => {
       // Get provider from connected wallet (fixes multi-wallet issue)
       const provider = await getWalletProvider();
       
-      console.log('🚀 [BUILD v5.3] sendRawTransaction for approve');
+      console.log('🚀 [BUILD v5.4] sendRawTransaction for approve');
       const approveCalldata = encodeFunctionData({
         abi: ERC20_ABI,
         functionName: 'approve',
@@ -439,7 +446,7 @@ export const BalanceFigma = () => {
         provider,
       });
       
-      console.log('🚀 [BUILD v5.3] Approval submitted, hash:', txHash);
+      console.log('🚀 [BUILD v5.4] Approval submitted, hash:', txHash);
       upsertMessage('deposit-approving', { type: 'pending', message: 'Waiting for approval confirmation...', txHash: txHash as `0x${string}`, chainId });
       
       // Wait for approval to be confirmed on-chain before proceeding
@@ -450,10 +457,10 @@ export const BalanceFigma = () => {
         const newAllowance = result.data as bigint | undefined;
         if (newAllowance && newAllowance > BigInt(0)) {
           approvalConfirmed = true;
-          console.log('✅ [BUILD v5.3] Approval confirmed on-chain, allowance:', newAllowance.toString());
+          console.log('✅ [BUILD v5.4] Approval confirmed on-chain, allowance:', newAllowance.toString());
           break;
         }
-        console.log(`🔄 [BUILD v5.3] Waiting for approval confirmation... attempt ${i + 1}/15`);
+        console.log(`🔄 [BUILD v5.4] Waiting for approval confirmation... attempt ${i + 1}/15`);
       }
       
       if (!approvalConfirmed) {
@@ -526,8 +533,8 @@ export const BalanceFigma = () => {
       const provider = await getWalletProvider();
       
       if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
-        console.log('🚀 [BUILD v5.3] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.3] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.4] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.4] Gas limit (hex):', gasHex);
         upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
         
         // Use raw eth_sendTransaction - bypasses ALL wagmi/viem layers
@@ -545,7 +552,7 @@ export const BalanceFigma = () => {
           chainId,
           provider,
         });
-        console.log('🚀 [BUILD v5.3] Raw transaction submitted successfully, hash:', txHash);
+        console.log('🚀 [BUILD v5.4] Raw transaction submitted successfully, hash:', txHash);
         // Raw transaction submitted - show success
         setDepositStep('confirming');
         removeMessage('deposit-pending');
@@ -554,9 +561,9 @@ export const BalanceFigma = () => {
         return; // Exit early, success handled
         
       } else {
-        console.log('🚀 [BUILD v5.3] Using deposit with signature via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.3] Gas limit (hex):', gasHex);
-        console.log('🚀 [BUILD v5.3] Snapshot:', JSON.stringify({
+        console.log('🚀 [BUILD v5.4] Using deposit with signature via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.4] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.4] Snapshot:', JSON.stringify({
           balance: snapshot.balance,
           nonce: snapshot.nonce,
           deadline: snapshot.deadline,
@@ -592,7 +599,7 @@ export const BalanceFigma = () => {
             chainId,
             provider,
           });
-          console.log('🚀 [BUILD v5.3] Raw transaction submitted successfully, hash:', txHash);
+          console.log('🚀 [BUILD v5.4] Raw transaction submitted successfully, hash:', txHash);
           // Raw transaction submitted - show success (user can track in wallet)
           setDepositStep('confirming');
           removeMessage('deposit-pending');
@@ -601,7 +608,7 @@ export const BalanceFigma = () => {
           return; // Exit early, success handled
         } catch (signatureError) {
           // If signature deposit fails, try regular deposit as fallback
-          console.warn('🚀 [BUILD v5.3] Signature deposit failed, trying regular deposit:', signatureError);
+          console.warn('🚀 [BUILD v5.4] Signature deposit failed, trying regular deposit:', signatureError);
           upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
           
           const fallbackCalldata = encodeFunctionData({
@@ -618,7 +625,7 @@ export const BalanceFigma = () => {
             chainId,
             provider,
           });
-          console.log('🚀 [BUILD v5.3] Fallback raw transaction submitted successfully, hash:', txHash);
+          console.log('🚀 [BUILD v5.4] Fallback raw transaction submitted successfully, hash:', txHash);
           // Raw transaction submitted - show success
           setDepositStep('confirming');
           removeMessage('deposit-pending');
@@ -1185,10 +1192,11 @@ export const BalanceFigma = () => {
     
     try {
       setWithdrawStep('withdrawing');
-      console.log('💳 [BUILD v5.3] Starting withdrawal:', withdrawAmount, 'USDC');
+      console.log('💳 [BUILD v5.4] Starting withdrawal:', withdrawAmount, 'USDC');
       
       const amountInWei = parseUnits(withdrawAmount, 6);
-      const gasHex = toHex(350000);
+      // Increased gas limit for withdraw (500k) - helps MetaMask simulation succeed
+      const gasHex = toHex(500000);
       
       // Get provider from connected wallet (fixes multi-wallet issue)
       const provider = await getWalletProvider();
@@ -1200,7 +1208,7 @@ export const BalanceFigma = () => {
         args: [amountInWei, address as `0x${string}`, address as `0x${string}`],
       });
       
-      console.log('🚀 [BUILD v5.3] sendRawTransaction for withdraw');
+      console.log('🚀 [BUILD v5.4] sendRawTransaction for withdraw');
       const txHash = await sendRawTransaction({
         from: address,
         to: getContractAddress(chainId) as string,
@@ -1210,7 +1218,7 @@ export const BalanceFigma = () => {
         provider,
       });
       
-      console.log('🚀 [BUILD v5.3] Withdrawal submitted, hash:', txHash);
+      console.log('🚀 [BUILD v5.4] Withdrawal submitted, hash:', txHash);
       
       // Show success
       setWithdrawStep('confirming');
