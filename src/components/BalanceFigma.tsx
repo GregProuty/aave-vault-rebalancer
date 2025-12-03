@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { formatUnits, parseUnits } from 'viem';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSendTransaction } from 'wagmi';
+import { formatUnits, parseUnits, encodeFunctionData } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
 import { getDepositSignature } from '@/utils/oracleClient';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
@@ -79,9 +79,13 @@ export const BalanceFigma = () => {
   const { writeContract: writeVault, data: vaultTxHash, isPending: isVaultPending, error: vaultWriteError } = useWriteContract();
   const { writeContract: writeUSDC, data: usdcTxHash, isPending: isUSDCPending, error: usdcWriteError } = useWriteContract();
   
+  // Direct transaction hook - bypasses some wagmi layers for better MetaMask compatibility
+  const { sendTransactionAsync, data: sendTxHash, error: sendTxError } = useSendTransaction();
+  
   // Transaction receipt hooks
   const { isSuccess: isVaultTxSuccess, isError: isVaultTxError } = useWaitForTransactionReceipt({ hash: vaultTxHash, chainId });
   const { isLoading: isUSDCTxLoading, isSuccess: isUSDCTxSuccess, isError: isUSDCTxError } = useWaitForTransactionReceipt({ hash: usdcTxHash, chainId });
+  const { isSuccess: isSendTxSuccess, isError: isSendTxError } = useWaitForTransactionReceipt({ hash: sendTxHash, chainId });
   
   // Read user's USDC balance
   const { refetch: refetchUSDCBalance } = useReadContract({
@@ -153,8 +157,8 @@ export const BalanceFigma = () => {
   const hasEnoughAllowance = (amount: string) => {
     if (!usdcAllowance || !amount || !isValidAmount(amount)) return false;
     try {
-      const depositAmountInWei = parseUnits(amount, 6);
-      return usdcAllowance >= depositAmountInWei;
+    const depositAmountInWei = parseUnits(amount, 6);
+    return usdcAllowance >= depositAmountInWei;
     } catch {
       return false;
     }
@@ -412,24 +416,29 @@ export const BalanceFigma = () => {
       // Check if cross-chain assets exist (balance > 0)
       // The contract requires crossChainInvestedAssets > 0 for depositWithSignature
       if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
-        console.log('🚀 [BUILD v3.0] No cross-chain assets, using regular deposit');
-        console.log('🚀 [BUILD v3.0] Gas limit: 350000');
+        console.log('🚀 [BUILD v4.0] No cross-chain assets, using regular deposit via sendTransaction');
+        console.log('🚀 [BUILD v4.0] Gas limit: 350000');
         upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
         
-        // Use regular deposit when no cross-chain assets exist
-        await writeVault({
-          address: getContractAddress(chainId) as `0x${string}`,
+        // Use sendTransaction with encoded calldata for better MetaMask compatibility
+        const depositCalldata = encodeFunctionData({
           abi: AAVE_VAULT_ABI,
           functionName: 'deposit',
           args: [amountInWei, address as `0x${string}`],
-          chainId,
-          gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
         });
         
+        await sendTransactionAsync({
+          to: getContractAddress(chainId) as `0x${string}`,
+          data: depositCalldata,
+          gas: BigInt(350000),
+          chainId,
+        });
+        console.log('🚀 [BUILD v4.0] sendTransaction completed successfully');
+        
       } else {
-        console.log('🚀 [BUILD v3.0] Using deposit with signature');
-        console.log('🚀 [BUILD v3.0] Gas limit: 350000');
-        console.log('🚀 [BUILD v3.0] Snapshot:', JSON.stringify({
+        console.log('🚀 [BUILD v4.0] Using deposit with signature via sendTransaction');
+        console.log('🚀 [BUILD v4.0] Gas limit: 350000');
+        console.log('🚀 [BUILD v4.0] Snapshot:', JSON.stringify({
           balance: snapshot.balance,
           nonce: snapshot.nonce,
           deadline: snapshot.deadline,
@@ -439,40 +448,48 @@ export const BalanceFigma = () => {
         upsertMessage('deposit-pending', { type: 'pending', message: 'Deposit with signature in progress...' });
         
         try {
-          // Call depositWithExtraInfoViaSignature with the signed snapshot
-          await writeVault({
-            address: getContractAddress(chainId) as `0x${string}`,
-            abi: AAVE_VAULT_ABI,
-            functionName: 'depositWithExtraInfoViaSignature',
-            args: [
-              amountInWei,
-              address as `0x${string}`,
-              {
-                balance: BigInt(snapshot.balance),
-                nonce: BigInt(snapshot.nonce),
-                deadline: BigInt(snapshot.deadline),
-                assets: BigInt(snapshot.assets),
-                receiver: snapshot.receiver as `0x${string}`,
-              },
-              snapshot.signature as `0x${string}`,
-            ],
-            chainId,
-            gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
+          // Use sendTransaction with encoded calldata - bypasses wagmi's writeContract layer
+          const signatureDepositCalldata = encodeFunctionData({
+          abi: AAVE_VAULT_ABI,
+          functionName: 'depositWithExtraInfoViaSignature',
+          args: [
+            amountInWei,
+            address as `0x${string}`,
+            {
+              balance: BigInt(snapshot.balance),
+              nonce: BigInt(snapshot.nonce),
+              deadline: BigInt(snapshot.deadline),
+              assets: BigInt(snapshot.assets),
+              receiver: snapshot.receiver as `0x${string}`,
+            },
+            snapshot.signature as `0x${string}`,
+          ],
           });
-          console.log('🚀 [BUILD v3.0] writeVault call completed successfully');
+          
+          await sendTransactionAsync({
+            to: getContractAddress(chainId) as `0x${string}`,
+            data: signatureDepositCalldata,
+            gas: BigInt(350000),
+            chainId,
+          });
+          console.log('🚀 [BUILD v4.0] sendTransaction completed successfully');
         } catch (signatureError) {
           // If signature deposit fails, try regular deposit as fallback
-          console.warn('🚀 [BUILD v3.0] Signature deposit failed, trying regular deposit:', signatureError);
+          console.warn('🚀 [BUILD v4.0] Signature deposit failed, trying regular deposit:', signatureError);
           upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
           
-          await writeVault({
-            address: getContractAddress(chainId) as `0x${string}`,
+          const fallbackCalldata = encodeFunctionData({
             abi: AAVE_VAULT_ABI,
             functionName: 'deposit',
             args: [amountInWei, address as `0x${string}`],
-            chainId,
-            gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
           });
+          
+          await sendTransactionAsync({
+            to: getContractAddress(chainId) as `0x${string}`,
+            data: fallbackCalldata,
+            gas: BigInt(350000),
+          chainId,
+        });
         }
       }
       
@@ -516,20 +533,23 @@ export const BalanceFigma = () => {
       // Also refetch allowance for future deposits
       refetchAllowance();
     }
-    if (isVaultTxSuccess && (depositStep === 'depositing' || depositStep === 'error')) {
+    // Handle deposit success from either writeVault or sendTransaction
+    if ((isVaultTxSuccess || isSendTxSuccess) && (depositStep === 'depositing' || depositStep === 'error')) {
       setDepositStep('confirming');
       removeMessage('deposit-pending');
-      upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC completed successfully!`, txHash: vaultTxHash, chainId });
+      const txHash = vaultTxHash || sendTxHash;
+      upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC completed successfully!`, txHash, chainId });
       // Refresh all balances immediately after successful deposit
       refreshAllBalances();
       // Stay on confirmation screen until user clicks "Done"
     }
-    if (isVaultTxSuccess && (withdrawStep === 'withdrawing' || withdrawStep === 'error')) {
+    if ((isVaultTxSuccess || isSendTxSuccess) && (withdrawStep === 'withdrawing' || withdrawStep === 'error')) {
       setWithdrawStep('confirming');
+      const txHash = vaultTxHash || sendTxHash;
       addMessage({
         type: 'success',
         message: `Withdrawal of ${withdrawAmount} USDC completed successfully!`,
-        txHash: vaultTxHash,
+        txHash,
         chainId
       });
       // Refresh all balances immediately after successful withdrawal
@@ -544,12 +564,13 @@ export const BalanceFigma = () => {
       setErrorMessage(errorMsg);
       upsertMessage('deposit-approving', { type: 'error', message: errorMsg, txHash: usdcTxHash, chainId });
     }
-    if (isVaultTxError && depositStep === 'depositing') {
+    if ((isVaultTxError || isSendTxError) && depositStep === 'depositing') {
       setDepositStep('error');
       setErrorMessage('Deposit transaction failed. If it succeeded in your wallet, this will update shortly.');
-      upsertMessage('deposit-pending', { type: 'error', message: 'Deposit failed. Please try again.', txHash: vaultTxHash, chainId });
+      const txHash = vaultTxHash || sendTxHash;
+      upsertMessage('deposit-pending', { type: 'error', message: 'Deposit failed. Please try again.', txHash, chainId });
     }
-    if (isVaultTxError && withdrawStep === 'withdrawing') {
+    if ((isVaultTxError || isSendTxError) && withdrawStep === 'withdrawing') {
       setWithdrawStep('error');
       setErrorMessage('Withdrawal transaction failed. If it succeeded in your wallet, this will update shortly.');
     }
@@ -590,7 +611,20 @@ export const BalanceFigma = () => {
         setErrorMessage(`Withdrawal failed: ${vaultWriteError.message || 'Please try again.'}`);
       }
     }
-  }, [isUSDCTxSuccess, isVaultTxSuccess, isUSDCTxError, isVaultTxError, usdcWriteError, vaultWriteError, depositStep, withdrawStep]);
+    
+    // Handle sendTransaction errors
+    if (sendTxError && depositStep === 'depositing') {
+      setDepositStep('error');
+      if (sendTxError.message?.includes('User rejected') || 
+          sendTxError.message?.includes('rejected') || 
+          sendTxError.message?.includes('denied') ||
+          sendTxError.message?.includes('UserRejectedRequestError')) {
+        setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
+      } else {
+        setErrorMessage(`Deposit failed: ${sendTxError.message || 'Please try again.'}`);
+      }
+    }
+  }, [isUSDCTxSuccess, isVaultTxSuccess, isSendTxSuccess, isUSDCTxError, isVaultTxError, isSendTxError, usdcWriteError, vaultWriteError, sendTxError, depositStep, withdrawStep, vaultTxHash, sendTxHash]);
 
   // If user cancels in wallet or transaction fails, show appropriate error
   useEffect(() => {
@@ -641,7 +675,7 @@ export const BalanceFigma = () => {
     if (usdcWriteError && depositStep === 'approving') {
       setDepositStep('error');
       if (isUserRejection(usdcWriteError)) {
-        setErrorMessage('Approval was cancelled in wallet.');
+      setErrorMessage('Approval was cancelled in wallet.');
       } else {
         console.error('Approval error:', usdcWriteError);
         setErrorMessage(getCleanErrorMessage(usdcWriteError, 'Approval'));
@@ -650,7 +684,7 @@ export const BalanceFigma = () => {
     if (vaultWriteError && depositStep === 'depositing') {
       setDepositStep('error');
       if (isUserRejection(vaultWriteError)) {
-        setErrorMessage('Deposit was cancelled in wallet.');
+      setErrorMessage('Deposit was cancelled in wallet.');
       } else {
         console.error('Deposit error:', vaultWriteError);
         setErrorMessage(getCleanErrorMessage(vaultWriteError, 'Deposit'));
@@ -659,7 +693,7 @@ export const BalanceFigma = () => {
     if (vaultWriteError && withdrawStep === 'withdrawing') {
       setWithdrawStep('error');
       if (isUserRejection(vaultWriteError)) {
-        setErrorMessage('Withdrawal was cancelled in wallet.');
+      setErrorMessage('Withdrawal was cancelled in wallet.');
       } else {
         console.error('Withdrawal error:', vaultWriteError);
         setErrorMessage(getCleanErrorMessage(vaultWriteError, 'Withdrawal'));
@@ -1310,21 +1344,21 @@ export const BalanceFigma = () => {
         : errorMessage;
       
       return (
-        <>
-          <h3 className="text-base font-medium mb-6 text-white font-display">Withdraw</h3>
+    <>
+      <h3 className="text-base font-medium mb-6 text-white font-display">Withdraw</h3>
           
-          <div className="text-center py-8">
+      <div className="text-center py-8">
             <div className="text-red-400 text-4xl mb-4">❌</div>
             <p className="text-white mb-2">Withdrawal Failed</p>
             <p className="text-gray-400 text-sm mb-4 break-words max-w-full overflow-hidden">{displayError}</p>
             
             <div className="flex gap-2">
-              <button 
-                onClick={handleCancel}
-                className="bg-gray-700 text-white py-2 px-6 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
-              >
-                Cancel
-              </button>
+        <button 
+          onClick={handleCancel}
+          className="bg-gray-700 text-white py-2 px-6 rounded font-medium hover:bg-gray-600 transition-colors text-sm"
+        >
+          Cancel
+        </button>
               <button 
                 onClick={() => setWithdrawStep('input')}
                 className="bg-gray-800 text-white py-2 px-4 rounded font-medium hover:bg-gray-700 transition-colors text-sm flex-1"
@@ -1332,9 +1366,9 @@ export const BalanceFigma = () => {
                 Try Again
               </button>
             </div>
-          </div>
-        </>
-      );
+      </div>
+    </>
+  );
     }
 
     return null;
