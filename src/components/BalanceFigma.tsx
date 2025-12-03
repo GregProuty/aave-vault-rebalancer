@@ -412,7 +412,8 @@ export const BalanceFigma = () => {
       // Check if cross-chain assets exist (balance > 0)
       // The contract requires crossChainInvestedAssets > 0 for depositWithSignature
       if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
-        console.log('⚠️ No cross-chain assets yet, using regular deposit method');
+        console.log('🚀 [BUILD v3.0] No cross-chain assets, using regular deposit');
+        console.log('🚀 [BUILD v3.0] Gas limit: 350000');
         upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
         
         // Use regular deposit when no cross-chain assets exist
@@ -422,10 +423,19 @@ export const BalanceFigma = () => {
           functionName: 'deposit',
           args: [amountInWei, address as `0x${string}`],
           chainId,
+          gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
         });
         
       } else {
-        console.log('🔐 Using deposit with signature (cross-chain assets: ' + snapshot.balance + ')');
+        console.log('🚀 [BUILD v3.0] Using deposit with signature');
+        console.log('🚀 [BUILD v3.0] Gas limit: 350000');
+        console.log('🚀 [BUILD v3.0] Snapshot:', JSON.stringify({
+          balance: snapshot.balance,
+          nonce: snapshot.nonce,
+          deadline: snapshot.deadline,
+          assets: snapshot.assets,
+          receiver: snapshot.receiver
+        }));
         upsertMessage('deposit-pending', { type: 'pending', message: 'Deposit with signature in progress...' });
         
         try {
@@ -449,9 +459,10 @@ export const BalanceFigma = () => {
             chainId,
             gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
           });
+          console.log('🚀 [BUILD v3.0] writeVault call completed successfully');
         } catch (signatureError) {
           // If signature deposit fails, try regular deposit as fallback
-          console.warn('⚠️ Signature deposit failed, trying regular deposit:', signatureError);
+          console.warn('🚀 [BUILD v3.0] Signature deposit failed, trying regular deposit:', signatureError);
           upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
           
           await writeVault({
@@ -460,6 +471,7 @@ export const BalanceFigma = () => {
             functionName: 'deposit',
             args: [amountInWei, address as `0x${string}`],
             chainId,
+            gas: BigInt(350000), // Explicit gas limit - bypasses broken estimation
           });
         }
       }
