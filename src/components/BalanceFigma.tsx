@@ -19,7 +19,7 @@ async function sendRawTransaction(params: {
   gas: string;
   chainId: number;
 }): Promise<string> {
-  console.log('🚀 [BUILD v5.1] sendRawTransaction called with:', params);
+  console.log('🚀 [BUILD v5.2] sendRawTransaction called with:', params);
   
   // Get ethereum provider
   const ethereum = (window as unknown as { ethereum?: { request: (args: { method: string; params: unknown[] }) => Promise<string> } }).ethereum;
@@ -38,7 +38,7 @@ async function sendRawTransaction(params: {
     }],
   });
   
-  console.log('🚀 [BUILD v5.1] Transaction sent successfully:', txHash);
+  console.log('🚀 [BUILD v5.2] Transaction sent successfully:', txHash);
   return txHash;
 }
 
@@ -361,6 +361,18 @@ export const BalanceFigma = () => {
     }
   };
 
+  // Poll for balance updates after transaction (waits for on-chain confirmation)
+  const pollForBalanceUpdate = useCallback(async (txType: string) => {
+    console.log(`🔄 [BUILD v5.2] Starting balance polling after ${txType}...`);
+    // Poll every 2 seconds for up to 20 seconds (10 attempts)
+    for (let i = 0; i < 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await refreshAllBalances();
+      console.log(`🔄 [BUILD v5.2] Balance refresh attempt ${i + 1}/10 after ${txType}`);
+    }
+    console.log(`✅ [BUILD v5.2] Balance polling complete for ${txType}`);
+  }, [refetchUSDCBalance, refetchVaultShares, refetchTotalAssets, refetchTotalSupply, refetchAllowance, refetchVaultBalance]);
+
   // Deposit flow functions
   const handleApproveUSDC = async () => {
     if (!address || !chainId || !depositAmount) return;
@@ -381,7 +393,7 @@ export const BalanceFigma = () => {
       const gasHex = toHex(100000);
       
       // Use raw eth_sendTransaction - bypasses wagmi/viem layers that cause MetaMask simulation failures
-      console.log('🚀 [BUILD v5.1] sendRawTransaction for approve');
+      console.log('🚀 [BUILD v5.2] sendRawTransaction for approve');
       const approveCalldata = encodeFunctionData({
         abi: ERC20_ABI,
         functionName: 'approve',
@@ -396,7 +408,7 @@ export const BalanceFigma = () => {
         chainId,
       });
       
-      console.log('🚀 [BUILD v5.1] Approval submitted, hash:', txHash);
+      console.log('🚀 [BUILD v5.2] Approval submitted, hash:', txHash);
       upsertMessage('deposit-approving', { type: 'success', message: 'Approval successful! Proceeding with deposit...', txHash: txHash as `0x${string}`, chainId });
       
       // Proceed with deposit after approval
@@ -461,8 +473,8 @@ export const BalanceFigma = () => {
       const gasHex = toHex(350000); // Convert gas to hex for raw eth_sendTransaction
       
       if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
-        console.log('🚀 [BUILD v5.1] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.1] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.2] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.2] Gas limit (hex):', gasHex);
         upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
         
         // Use raw eth_sendTransaction - bypasses ALL wagmi/viem layers
@@ -479,18 +491,18 @@ export const BalanceFigma = () => {
           gas: gasHex,
           chainId,
         });
-        console.log('🚀 [BUILD v5.1] Raw transaction submitted successfully, hash:', txHash);
+        console.log('🚀 [BUILD v5.2] Raw transaction submitted successfully, hash:', txHash);
         // Raw transaction submitted - show success
         setDepositStep('confirming');
         removeMessage('deposit-pending');
         upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
-        refreshAllBalances();
+        pollForBalanceUpdate('deposit'); // Poll until confirmed
         return; // Exit early, success handled
         
       } else {
-        console.log('🚀 [BUILD v5.1] Using deposit with signature via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.1] Gas limit (hex):', gasHex);
-        console.log('🚀 [BUILD v5.1] Snapshot:', JSON.stringify({
+        console.log('🚀 [BUILD v5.2] Using deposit with signature via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.2] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.2] Snapshot:', JSON.stringify({
           balance: snapshot.balance,
           nonce: snapshot.nonce,
           deadline: snapshot.deadline,
@@ -525,16 +537,16 @@ export const BalanceFigma = () => {
             gas: gasHex,
             chainId,
           });
-          console.log('🚀 [BUILD v5.1] Raw transaction submitted successfully, hash:', txHash);
+          console.log('🚀 [BUILD v5.2] Raw transaction submitted successfully, hash:', txHash);
           // Raw transaction submitted - show success (user can track in wallet)
           setDepositStep('confirming');
           removeMessage('deposit-pending');
           upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
-          refreshAllBalances();
+          pollForBalanceUpdate('deposit-with-signature'); // Poll until confirmed
           return; // Exit early, success handled
         } catch (signatureError) {
           // If signature deposit fails, try regular deposit as fallback
-          console.warn('🚀 [BUILD v5.1] Signature deposit failed, trying regular deposit:', signatureError);
+          console.warn('🚀 [BUILD v5.2] Signature deposit failed, trying regular deposit:', signatureError);
           upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
           
           const fallbackCalldata = encodeFunctionData({
@@ -550,12 +562,12 @@ export const BalanceFigma = () => {
             gas: gasHex,
             chainId,
           });
-          console.log('🚀 [BUILD v5.1] Fallback raw transaction submitted successfully, hash:', txHash);
+          console.log('🚀 [BUILD v5.2] Fallback raw transaction submitted successfully, hash:', txHash);
           // Raw transaction submitted - show success
           setDepositStep('confirming');
           removeMessage('deposit-pending');
           upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
-          refreshAllBalances();
+          pollForBalanceUpdate('deposit-fallback'); // Poll until confirmed
           return; // Exit early, success handled
         }
       }
@@ -1117,7 +1129,7 @@ export const BalanceFigma = () => {
     
     try {
       setWithdrawStep('withdrawing');
-      console.log('💳 [BUILD v5.1] Starting withdrawal:', withdrawAmount, 'USDC');
+      console.log('💳 [BUILD v5.2] Starting withdrawal:', withdrawAmount, 'USDC');
       
       const amountInWei = parseUnits(withdrawAmount, 6);
       const gasHex = toHex(350000);
@@ -1129,7 +1141,7 @@ export const BalanceFigma = () => {
         args: [amountInWei, address as `0x${string}`, address as `0x${string}`],
       });
       
-      console.log('🚀 [BUILD v5.1] sendRawTransaction for withdraw');
+      console.log('🚀 [BUILD v5.2] sendRawTransaction for withdraw');
       const txHash = await sendRawTransaction({
         from: address,
         to: getContractAddress(chainId) as string,
@@ -1138,7 +1150,7 @@ export const BalanceFigma = () => {
         chainId,
       });
       
-      console.log('🚀 [BUILD v5.1] Withdrawal submitted, hash:', txHash);
+      console.log('🚀 [BUILD v5.2] Withdrawal submitted, hash:', txHash);
       
       // Show success
       setWithdrawStep('confirming');
@@ -1148,7 +1160,7 @@ export const BalanceFigma = () => {
         txHash: txHash as `0x${string}`,
         chainId
       });
-      refreshAllBalances();
+      pollForBalanceUpdate('withdraw'); // Poll until confirmed
       
     } catch (error: unknown) {
       console.error('Withdrawal failed:', error);
