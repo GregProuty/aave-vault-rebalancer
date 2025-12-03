@@ -25,13 +25,13 @@ async function sendRawTransaction(params: {
   chainId: number;
   provider?: EthereumProvider; // Use connected wallet's provider if available
 }): Promise<string> {
-  console.log('🚀 [BUILD v5.4] sendRawTransaction called with:', { ...params, provider: params.provider ? '[provider]' : undefined });
+  console.log('🚀 [BUILD v5.6] sendRawTransaction called with:', { ...params, provider: params.provider ? '[provider]' : undefined });
   
   // Use provided provider (from connected wallet) or fall back to window.ethereum
   let ethereum: EthereumProvider | undefined = params.provider;
   
   if (!ethereum) {
-    console.log('⚠️ [BUILD v5.4] No provider passed, falling back to window.ethereum');
+    console.log('⚠️ [BUILD v5.6] No provider passed, falling back to window.ethereum');
     ethereum = (window as unknown as { ethereum?: EthereumProvider }).ethereum;
   }
   
@@ -44,7 +44,7 @@ async function sendRawTransaction(params: {
   
   // Send transaction through the connected wallet with all explicit parameters
   // Adding value, chainId helps MetaMask's simulation succeed
-  console.log('🚀 [BUILD v5.4] Sending with explicit params - chainId:', chainIdHex, 'gas:', params.gas);
+  console.log('🚀 [BUILD v5.6] Sending with explicit params - chainId:', chainIdHex, 'gas:', params.gas);
   const txHash = await ethereum.request({
     method: 'eth_sendTransaction',
     params: [{
@@ -57,7 +57,7 @@ async function sendRawTransaction(params: {
     }],
   });
   
-  console.log('🚀 [BUILD v5.4] Transaction sent successfully:', txHash);
+  console.log('🚀 [BUILD v5.6] Transaction sent successfully:', txHash);
   return txHash;
 }
 
@@ -77,15 +77,15 @@ export const BalanceFigma = () => {
   // Get the provider from the connected wallet (fixes issue with multiple wallets)
   const getWalletProvider = useCallback(async (): Promise<EthereumProvider | undefined> => {
     if (!connector) {
-      console.log('⚠️ [BUILD v5.4] No connector available');
+      console.log('⚠️ [BUILD v5.6] No connector available');
       return undefined;
     }
     try {
       const provider = await connector.getProvider();
-      console.log('✅ [BUILD v5.4] Got provider from connector:', connector.name);
+      console.log('✅ [BUILD v5.6] Got provider from connector:', connector.name);
       return provider as EthereumProvider;
     } catch (error) {
-      console.error('⚠️ [BUILD v5.4] Failed to get provider from connector:', error);
+      console.error('⚠️ [BUILD v5.6] Failed to get provider from connector:', error);
       return undefined;
     }
   }, [connector]);
@@ -398,14 +398,14 @@ export const BalanceFigma = () => {
 
   // Poll for balance updates after transaction (waits for on-chain confirmation)
   const pollForBalanceUpdate = useCallback(async (txType: string) => {
-    console.log(`🔄 [BUILD v5.4] Starting balance polling after ${txType}...`);
+    console.log(`🔄 [BUILD v5.6] Starting balance polling after ${txType}...`);
     // Poll every 2 seconds for up to 20 seconds (10 attempts)
     for (let i = 0; i < 10; i++) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       await refreshAllBalances();
-      console.log(`🔄 [BUILD v5.4] Balance refresh attempt ${i + 1}/10 after ${txType}`);
+      console.log(`🔄 [BUILD v5.6] Balance refresh attempt ${i + 1}/10 after ${txType}`);
     }
-    console.log(`✅ [BUILD v5.4] Balance polling complete for ${txType}`);
+    console.log(`✅ [BUILD v5.6] Balance polling complete for ${txType}`);
   }, [refetchUSDCBalance, refetchVaultShares, refetchTotalAssets, refetchTotalSupply, refetchAllowance, refetchVaultBalance]);
 
   // Deposit flow functions
@@ -430,7 +430,7 @@ export const BalanceFigma = () => {
       // Get provider from connected wallet (fixes multi-wallet issue)
       const provider = await getWalletProvider();
       
-      console.log('🚀 [BUILD v5.4] sendRawTransaction for approve');
+      console.log('🚀 [BUILD v5.6] sendRawTransaction for approve');
       const approveCalldata = encodeFunctionData({
         abi: ERC20_ABI,
         functionName: 'approve',
@@ -446,7 +446,7 @@ export const BalanceFigma = () => {
         provider,
       });
       
-      console.log('🚀 [BUILD v5.4] Approval submitted, hash:', txHash);
+      console.log('🚀 [BUILD v5.6] Approval submitted, hash:', txHash);
       upsertMessage('deposit-approving', { type: 'pending', message: 'Waiting for approval confirmation...', txHash: txHash as `0x${string}`, chainId });
       
       // Wait for approval to be confirmed on-chain before proceeding
@@ -457,10 +457,10 @@ export const BalanceFigma = () => {
         const newAllowance = result.data as bigint | undefined;
         if (newAllowance && newAllowance > BigInt(0)) {
           approvalConfirmed = true;
-          console.log('✅ [BUILD v5.4] Approval confirmed on-chain, allowance:', newAllowance.toString());
+          console.log('✅ [BUILD v5.6] Approval confirmed on-chain, allowance:', newAllowance.toString());
           break;
         }
-        console.log(`🔄 [BUILD v5.4] Waiting for approval confirmation... attempt ${i + 1}/15`);
+        console.log(`🔄 [BUILD v5.6] Waiting for approval confirmation... attempt ${i + 1}/15`);
       }
       
       if (!approvalConfirmed) {
@@ -473,9 +473,36 @@ export const BalanceFigma = () => {
       handleConfirmDeposit();
       
     } catch (error: unknown) {
-      console.error('Approval failed:', error);
-      setDepositStep('error');
+      console.error('[BUILD v5.6] Approval failed:', error);
       removeMessage('deposit-approving');
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorMsg = (error as any)?.message || '';
+      
+      // BUILD v5.6: Check if this is MetaMask's false negative on Arbitrum Sepolia
+      if (errorMsg.includes('Internal JSON-RPC error') || errorMsg.includes('-32603')) {
+        console.log('🔍 [BUILD v5.6] MetaMask simulation error on approval - may have succeeded...');
+        
+        // Check allowance to see if approval actually worked
+        const result = await refetchAllowance();
+        const newAllowance = result.data as bigint | undefined;
+        if (newAllowance && newAllowance > BigInt(0)) {
+          console.log('✅ [BUILD v5.6] Approval actually succeeded! Proceeding with deposit...');
+          upsertMessage('deposit-approving', { type: 'success', message: 'Approval confirmed! Proceeding with deposit...' });
+          handleConfirmDeposit();
+          return;
+        }
+        
+        setDepositStep('error');
+        setErrorMessage(
+          'MetaMask reported an error, but this may be a false negative on testnets. ' +
+          'Please check Arbiscan to verify if your approval succeeded, then try again. ' +
+          'If needed, try using Rabby wallet for a better testnet experience.'
+        );
+        return;
+      }
+      
+      setDepositStep('error');
       
       // Handle different error types
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -533,8 +560,8 @@ export const BalanceFigma = () => {
       const provider = await getWalletProvider();
       
       if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
-        console.log('🚀 [BUILD v5.4] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.4] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.6] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.6] Gas limit (hex):', gasHex);
         upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
         
         // Use raw eth_sendTransaction - bypasses ALL wagmi/viem layers
@@ -552,7 +579,7 @@ export const BalanceFigma = () => {
           chainId,
           provider,
         });
-        console.log('🚀 [BUILD v5.4] Raw transaction submitted successfully, hash:', txHash);
+        console.log('🚀 [BUILD v5.6] Raw transaction submitted successfully, hash:', txHash);
         // Raw transaction submitted - show success
         setDepositStep('confirming');
         removeMessage('deposit-pending');
@@ -561,9 +588,9 @@ export const BalanceFigma = () => {
         return; // Exit early, success handled
         
       } else {
-        console.log('🚀 [BUILD v5.4] Using deposit with signature via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.4] Gas limit (hex):', gasHex);
-        console.log('🚀 [BUILD v5.4] Snapshot:', JSON.stringify({
+        console.log('🚀 [BUILD v5.6] Using deposit with signature via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.6] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.6] Snapshot:', JSON.stringify({
           balance: snapshot.balance,
           nonce: snapshot.nonce,
           deadline: snapshot.deadline,
@@ -599,7 +626,7 @@ export const BalanceFigma = () => {
             chainId,
             provider,
           });
-          console.log('🚀 [BUILD v5.4] Raw transaction submitted successfully, hash:', txHash);
+          console.log('🚀 [BUILD v5.6] Raw transaction submitted successfully, hash:', txHash);
           // Raw transaction submitted - show success (user can track in wallet)
           setDepositStep('confirming');
           removeMessage('deposit-pending');
@@ -608,7 +635,7 @@ export const BalanceFigma = () => {
           return; // Exit early, success handled
         } catch (signatureError) {
           // If signature deposit fails, try regular deposit as fallback
-          console.warn('🚀 [BUILD v5.4] Signature deposit failed, trying regular deposit:', signatureError);
+          console.warn('🚀 [BUILD v5.6] Signature deposit failed, trying regular deposit:', signatureError);
           upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
           
           const fallbackCalldata = encodeFunctionData({
@@ -625,7 +652,7 @@ export const BalanceFigma = () => {
             chainId,
             provider,
           });
-          console.log('🚀 [BUILD v5.4] Fallback raw transaction submitted successfully, hash:', txHash);
+          console.log('🚀 [BUILD v5.6] Fallback raw transaction submitted successfully, hash:', txHash);
           // Raw transaction submitted - show success
           setDepositStep('confirming');
           removeMessage('deposit-pending');
@@ -638,9 +665,31 @@ export const BalanceFigma = () => {
       // This shouldn't be reached with raw transactions, but keeping for backward compatibility
       
     } catch (error: unknown) {
-      console.error('Deposit failed:', error);
-      setDepositStep('error');
+      console.error('[BUILD v5.6] Deposit failed:', error);
       removeMessage('deposit-pending');
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorMessage = (error as any)?.message || '';
+      
+      // BUILD v5.6: Check if this is MetaMask's false negative on Arbitrum Sepolia
+      // MetaMask's simulation fails but the transaction may have actually succeeded
+      if (errorMessage.includes('Internal JSON-RPC error') || errorMessage.includes('-32603')) {
+        console.log('🔍 [BUILD v5.6] MetaMask simulation error detected - checking if tx may have succeeded...');
+        
+        // Show a more helpful message for this known issue
+        setDepositStep('error');
+        setErrorMessage(
+          'MetaMask reported an error, but this may be a false negative on testnets. ' +
+          'Please check Arbiscan to verify if your transaction actually succeeded. ' +
+          'If needed, try using Rabby wallet for a better testnet experience.'
+        );
+        
+        // Still poll for balance changes in case it worked
+        pollForBalanceUpdate('deposit-maybe-success');
+        return;
+      }
+      
+      setDepositStep('error');
       
       // Handle different error types
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1192,7 +1241,7 @@ export const BalanceFigma = () => {
     
     try {
       setWithdrawStep('withdrawing');
-      console.log('💳 [BUILD v5.5] Starting withdrawal:', withdrawAmount, 'USDC');
+      console.log('💳 [BUILD v5.6] Starting withdrawal:', withdrawAmount, 'USDC');
       
       // BUILD v5.5: Use redeem() instead of withdraw() - simpler state calculation may help MetaMask simulation
       // Calculate shares to burn: shares = assets * totalSupply / totalAssets
@@ -1203,16 +1252,16 @@ export const BalanceFigma = () => {
       if (totalAssets && totalSupply && totalAssets > BigInt(0)) {
         // shares = ceil(assets * totalSupply / totalAssets)
         sharesToBurn = (assetsWei * totalSupply + totalAssets - BigInt(1)) / totalAssets;
-        console.log('🧮 [BUILD v5.5] Calculated shares to burn:', sharesToBurn.toString(), 'for', withdrawAmount, 'USDC');
+        console.log('🧮 [BUILD v5.6] Calculated shares to burn:', sharesToBurn.toString(), 'for', withdrawAmount, 'USDC');
       } else {
         // Fallback: assume 1:1 ratio if we don't have the data
         sharesToBurn = assetsWei;
-        console.log('⚠️ [BUILD v5.5] Using 1:1 share ratio fallback');
+        console.log('⚠️ [BUILD v5.6] Using 1:1 share ratio fallback');
       }
       
       // Ensure we don't try to burn more shares than we have
       if (vaultShares && sharesToBurn > vaultShares) {
-        console.log('⚠️ [BUILD v5.5] Capping shares to user balance:', vaultShares.toString());
+        console.log('⚠️ [BUILD v5.6] Capping shares to user balance:', vaultShares.toString());
         sharesToBurn = vaultShares;
       }
       
@@ -1229,7 +1278,7 @@ export const BalanceFigma = () => {
         args: [sharesToBurn, address as `0x${string}`, address as `0x${string}`],
       });
       
-      console.log('🚀 [BUILD v5.5] sendRawTransaction for redeem (shares:', sharesToBurn.toString(), ')');
+      console.log('🚀 [BUILD v5.6] sendRawTransaction for redeem (shares:', sharesToBurn.toString(), ')');
       const txHash = await sendRawTransaction({
         from: address,
         to: getContractAddress(chainId) as string,
@@ -1239,7 +1288,7 @@ export const BalanceFigma = () => {
         provider,
       });
       
-      console.log('🚀 [BUILD v5.5] Redeem submitted, hash:', txHash);
+      console.log('🚀 [BUILD v5.6] Redeem submitted, hash:', txHash);
       
       // Show success
       setWithdrawStep('confirming');
@@ -1252,7 +1301,27 @@ export const BalanceFigma = () => {
       pollForBalanceUpdate('withdraw'); // Poll until confirmed
       
     } catch (error: unknown) {
-      console.error('[BUILD v5.5] Redeem failed:', error);
+      console.error('[BUILD v5.6] Redeem failed:', error);
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorMsg = (error as any)?.message || '';
+      
+      // BUILD v5.6: Check if this is MetaMask's false negative on Arbitrum Sepolia
+      if (errorMsg.includes('Internal JSON-RPC error') || errorMsg.includes('-32603')) {
+        console.log('🔍 [BUILD v5.6] MetaMask simulation error detected - tx may have succeeded...');
+        
+        setWithdrawStep('error');
+        setErrorMessage(
+          'MetaMask reported an error, but this may be a false negative on testnets. ' +
+          'Please check Arbiscan to verify if your transaction actually succeeded. ' +
+          'If needed, try using Rabby wallet for a better testnet experience.'
+        );
+        
+        // Still poll for balance changes in case it worked
+        pollForBalanceUpdate('withdraw-maybe-success');
+        return;
+      }
+      
       setWithdrawStep('error');
       
       // Handle different error types
