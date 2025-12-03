@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSendTransaction } from 'wagmi';
-import { formatUnits, parseUnits, encodeFunctionData } from 'viem';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { formatUnits, parseUnits, encodeFunctionData, toHex } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
 import { getDepositSignature } from '@/utils/oracleClient';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
@@ -10,6 +10,37 @@ import { Button } from '@/components/Button';
 import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
 import { useWelcome } from '@/contexts/WelcomeContext';
 import { useDeposit } from '@/contexts/DepositContext';
+
+// Direct MetaMask transaction sender - bypasses all wagmi/viem layers
+async function sendRawTransaction(params: {
+  from: string;
+  to: string;
+  data: string;
+  gas: string;
+  chainId: number;
+}): Promise<string> {
+  console.log('🚀 [BUILD v5.0] sendRawTransaction called with:', params);
+  
+  // Get ethereum provider
+  const ethereum = (window as unknown as { ethereum?: { request: (args: { method: string; params: unknown[] }) => Promise<string> } }).ethereum;
+  if (!ethereum) {
+    throw new Error('No ethereum provider found');
+  }
+  
+  // Send transaction directly to MetaMask
+  const txHash = await ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from: params.from,
+      to: params.to,
+      data: params.data,
+      gas: params.gas, // Already hex formatted
+    }],
+  });
+  
+  console.log('🚀 [BUILD v5.0] Transaction sent successfully:', txHash);
+  return txHash;
+}
 
 export const BalanceFigma = () => {
   const { address, isConnected, chainId, connector } = useAccount();
@@ -79,13 +110,9 @@ export const BalanceFigma = () => {
   const { writeContract: writeVault, data: vaultTxHash, isPending: isVaultPending, error: vaultWriteError } = useWriteContract();
   const { writeContract: writeUSDC, data: usdcTxHash, isPending: isUSDCPending, error: usdcWriteError } = useWriteContract();
   
-  // Direct transaction hook - bypasses some wagmi layers for better MetaMask compatibility
-  const { sendTransactionAsync, data: sendTxHash, error: sendTxError } = useSendTransaction();
-  
   // Transaction receipt hooks
   const { isSuccess: isVaultTxSuccess, isError: isVaultTxError } = useWaitForTransactionReceipt({ hash: vaultTxHash, chainId });
   const { isLoading: isUSDCTxLoading, isSuccess: isUSDCTxSuccess, isError: isUSDCTxError } = useWaitForTransactionReceipt({ hash: usdcTxHash, chainId });
-  const { isSuccess: isSendTxSuccess, isError: isSendTxError } = useWaitForTransactionReceipt({ hash: sendTxHash, chainId });
   
   // Read user's USDC balance
   const { refetch: refetchUSDCBalance } = useReadContract({
@@ -415,30 +442,39 @@ export const BalanceFigma = () => {
       
       // Check if cross-chain assets exist (balance > 0)
       // The contract requires crossChainInvestedAssets > 0 for depositWithSignature
+      const gasHex = toHex(350000); // Convert gas to hex for raw eth_sendTransaction
+      
       if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
-        console.log('🚀 [BUILD v4.0] No cross-chain assets, using regular deposit via sendTransaction');
-        console.log('🚀 [BUILD v4.0] Gas limit: 350000');
+        console.log('🚀 [BUILD v5.0] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.0] Gas limit (hex):', gasHex);
         upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
         
-        // Use sendTransaction with encoded calldata for better MetaMask compatibility
+        // Use raw eth_sendTransaction - bypasses ALL wagmi/viem layers
         const depositCalldata = encodeFunctionData({
           abi: AAVE_VAULT_ABI,
           functionName: 'deposit',
           args: [amountInWei, address as `0x${string}`],
         });
         
-        await sendTransactionAsync({
-          to: getContractAddress(chainId) as `0x${string}`,
+        const txHash = await sendRawTransaction({
+          from: address,
+          to: getContractAddress(chainId) as string,
           data: depositCalldata,
-          gas: BigInt(350000),
+          gas: gasHex,
           chainId,
         });
-        console.log('🚀 [BUILD v4.0] sendTransaction completed successfully');
+        console.log('🚀 [BUILD v5.0] Raw transaction submitted successfully, hash:', txHash);
+        // Raw transaction submitted - show success
+        setDepositStep('confirming');
+        removeMessage('deposit-pending');
+        upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
+        refreshAllBalances();
+        return; // Exit early, success handled
         
       } else {
-        console.log('🚀 [BUILD v4.0] Using deposit with signature via sendTransaction');
-        console.log('🚀 [BUILD v4.0] Gas limit: 350000');
-        console.log('🚀 [BUILD v4.0] Snapshot:', JSON.stringify({
+        console.log('🚀 [BUILD v5.0] Using deposit with signature via raw eth_sendTransaction');
+        console.log('🚀 [BUILD v5.0] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.0] Snapshot:', JSON.stringify({
           balance: snapshot.balance,
           nonce: snapshot.nonce,
           deadline: snapshot.deadline,
@@ -448,34 +484,41 @@ export const BalanceFigma = () => {
         upsertMessage('deposit-pending', { type: 'pending', message: 'Deposit with signature in progress...' });
         
         try {
-          // Use sendTransaction with encoded calldata - bypasses wagmi's writeContract layer
+          // Use raw eth_sendTransaction - bypasses ALL wagmi/viem layers
           const signatureDepositCalldata = encodeFunctionData({
-          abi: AAVE_VAULT_ABI,
-          functionName: 'depositWithExtraInfoViaSignature',
-          args: [
-            amountInWei,
-            address as `0x${string}`,
-            {
-              balance: BigInt(snapshot.balance),
-              nonce: BigInt(snapshot.nonce),
-              deadline: BigInt(snapshot.deadline),
-              assets: BigInt(snapshot.assets),
-              receiver: snapshot.receiver as `0x${string}`,
-            },
-            snapshot.signature as `0x${string}`,
-          ],
+            abi: AAVE_VAULT_ABI,
+            functionName: 'depositWithExtraInfoViaSignature',
+            args: [
+              amountInWei,
+              address as `0x${string}`,
+              {
+                balance: BigInt(snapshot.balance),
+                nonce: BigInt(snapshot.nonce),
+                deadline: BigInt(snapshot.deadline),
+                assets: BigInt(snapshot.assets),
+                receiver: snapshot.receiver as `0x${string}`,
+              },
+              snapshot.signature as `0x${string}`,
+            ],
           });
           
-          await sendTransactionAsync({
-            to: getContractAddress(chainId) as `0x${string}`,
+          const txHash = await sendRawTransaction({
+            from: address,
+            to: getContractAddress(chainId) as string,
             data: signatureDepositCalldata,
-            gas: BigInt(350000),
+            gas: gasHex,
             chainId,
           });
-          console.log('🚀 [BUILD v4.0] sendTransaction completed successfully');
+          console.log('🚀 [BUILD v5.0] Raw transaction submitted successfully, hash:', txHash);
+          // Raw transaction submitted - show success (user can track in wallet)
+          setDepositStep('confirming');
+          removeMessage('deposit-pending');
+          upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
+          refreshAllBalances();
+          return; // Exit early, success handled
         } catch (signatureError) {
           // If signature deposit fails, try regular deposit as fallback
-          console.warn('🚀 [BUILD v4.0] Signature deposit failed, trying regular deposit:', signatureError);
+          console.warn('🚀 [BUILD v5.0] Signature deposit failed, trying regular deposit:', signatureError);
           upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
           
           const fallbackCalldata = encodeFunctionData({
@@ -484,16 +527,24 @@ export const BalanceFigma = () => {
             args: [amountInWei, address as `0x${string}`],
           });
           
-          await sendTransactionAsync({
-            to: getContractAddress(chainId) as `0x${string}`,
+          const txHash = await sendRawTransaction({
+            from: address,
+            to: getContractAddress(chainId) as string,
             data: fallbackCalldata,
-            gas: BigInt(350000),
-          chainId,
-        });
+            gas: gasHex,
+            chainId,
+          });
+          console.log('🚀 [BUILD v5.0] Fallback raw transaction submitted successfully, hash:', txHash);
+          // Raw transaction submitted - show success
+          setDepositStep('confirming');
+          removeMessage('deposit-pending');
+          upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
+          refreshAllBalances();
+          return; // Exit early, success handled
         }
       }
       
-      // Transaction submitted successfully - the useEffect will handle the rest
+      // This shouldn't be reached with raw transactions, but keeping for backward compatibility
       
     } catch (error: unknown) {
       console.error('Deposit failed:', error);
@@ -533,27 +584,25 @@ export const BalanceFigma = () => {
       // Also refetch allowance for future deposits
       refetchAllowance();
     }
-    // Handle deposit success from either writeVault or sendTransaction
-    if ((isVaultTxSuccess || isSendTxSuccess) && (depositStep === 'depositing' || depositStep === 'error')) {
+    // Handle deposit success from writeVault (for approve flow)
+    if (isVaultTxSuccess && (depositStep === 'depositing' || depositStep === 'error')) {
       setDepositStep('confirming');
       removeMessage('deposit-pending');
-      const txHash = vaultTxHash || sendTxHash;
-      upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC completed successfully!`, txHash, chainId });
+      upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC completed successfully!`, txHash: vaultTxHash, chainId });
       // Refresh all balances immediately after successful deposit
       refreshAllBalances();
       // Stay on confirmation screen until user clicks "Done"
     }
-    if ((isVaultTxSuccess || isSendTxSuccess) && (withdrawStep === 'withdrawing' || withdrawStep === 'error')) {
+    if (isVaultTxSuccess && (withdrawStep === 'withdrawing' || withdrawStep === 'error')) {
       setWithdrawStep('confirming');
-      const txHash = vaultTxHash || sendTxHash;
       addMessage({
         type: 'success',
         message: `Withdrawal of ${withdrawAmount} USDC completed successfully!`,
-        txHash,
+        txHash: vaultTxHash,
         chainId
       });
       // Refresh all balances immediately after successful withdrawal
-        refreshAllBalances();
+      refreshAllBalances();
       // Stay on confirmation screen until user clicks "Done"
     }
     
@@ -564,13 +613,12 @@ export const BalanceFigma = () => {
       setErrorMessage(errorMsg);
       upsertMessage('deposit-approving', { type: 'error', message: errorMsg, txHash: usdcTxHash, chainId });
     }
-    if ((isVaultTxError || isSendTxError) && depositStep === 'depositing') {
+    if (isVaultTxError && depositStep === 'depositing') {
       setDepositStep('error');
       setErrorMessage('Deposit transaction failed. If it succeeded in your wallet, this will update shortly.');
-      const txHash = vaultTxHash || sendTxHash;
-      upsertMessage('deposit-pending', { type: 'error', message: 'Deposit failed. Please try again.', txHash, chainId });
+      upsertMessage('deposit-pending', { type: 'error', message: 'Deposit failed. Please try again.', txHash: vaultTxHash, chainId });
     }
-    if ((isVaultTxError || isSendTxError) && withdrawStep === 'withdrawing') {
+    if (isVaultTxError && withdrawStep === 'withdrawing') {
       setWithdrawStep('error');
       setErrorMessage('Withdrawal transaction failed. If it succeeded in your wallet, this will update shortly.');
     }
@@ -611,20 +659,7 @@ export const BalanceFigma = () => {
         setErrorMessage(`Withdrawal failed: ${vaultWriteError.message || 'Please try again.'}`);
       }
     }
-    
-    // Handle sendTransaction errors
-    if (sendTxError && depositStep === 'depositing') {
-      setDepositStep('error');
-      if (sendTxError.message?.includes('User rejected') || 
-          sendTxError.message?.includes('rejected') || 
-          sendTxError.message?.includes('denied') ||
-          sendTxError.message?.includes('UserRejectedRequestError')) {
-        setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
-      } else {
-        setErrorMessage(`Deposit failed: ${sendTxError.message || 'Please try again.'}`);
-      }
-    }
-  }, [isUSDCTxSuccess, isVaultTxSuccess, isSendTxSuccess, isUSDCTxError, isVaultTxError, isSendTxError, usdcWriteError, vaultWriteError, sendTxError, depositStep, withdrawStep, vaultTxHash, sendTxHash]);
+  }, [isUSDCTxSuccess, isVaultTxSuccess, isUSDCTxError, isVaultTxError, usdcWriteError, vaultWriteError, depositStep, withdrawStep]);
 
   // If user cancels in wallet or transaction fails, show appropriate error
   useEffect(() => {
