@@ -1192,46 +1192,67 @@ export const BalanceFigma = () => {
     
     try {
       setWithdrawStep('withdrawing');
-      console.log('💳 [BUILD v5.4] Starting withdrawal:', withdrawAmount, 'USDC');
+      console.log('💳 [BUILD v5.5] Starting withdrawal:', withdrawAmount, 'USDC');
       
-      const amountInWei = parseUnits(withdrawAmount, 6);
-      // Increased gas limit for withdraw (500k) - helps MetaMask simulation succeed
+      // BUILD v5.5: Use redeem() instead of withdraw() - simpler state calculation may help MetaMask simulation
+      // Calculate shares to burn: shares = assets * totalSupply / totalAssets
+      const assetsWei = parseUnits(withdrawAmount, 6);
+      
+      // Calculate shares needed (round up to ensure we get at least the requested assets)
+      let sharesToBurn: bigint;
+      if (totalAssets && totalSupply && totalAssets > BigInt(0)) {
+        // shares = ceil(assets * totalSupply / totalAssets)
+        sharesToBurn = (assetsWei * totalSupply + totalAssets - BigInt(1)) / totalAssets;
+        console.log('🧮 [BUILD v5.5] Calculated shares to burn:', sharesToBurn.toString(), 'for', withdrawAmount, 'USDC');
+      } else {
+        // Fallback: assume 1:1 ratio if we don't have the data
+        sharesToBurn = assetsWei;
+        console.log('⚠️ [BUILD v5.5] Using 1:1 share ratio fallback');
+      }
+      
+      // Ensure we don't try to burn more shares than we have
+      if (vaultShares && sharesToBurn > vaultShares) {
+        console.log('⚠️ [BUILD v5.5] Capping shares to user balance:', vaultShares.toString());
+        sharesToBurn = vaultShares;
+      }
+      
+      // Increased gas limit for redeem (500k) - helps MetaMask simulation succeed
       const gasHex = toHex(500000);
       
       // Get provider from connected wallet (fixes multi-wallet issue)
       const provider = await getWalletProvider();
       
-      // Use raw eth_sendTransaction - bypasses wagmi/viem layers that cause MetaMask simulation failures
-      const withdrawCalldata = encodeFunctionData({
+      // Use redeem() instead of withdraw() - specifies shares to burn rather than assets to receive
+      const redeemCalldata = encodeFunctionData({
         abi: AAVE_VAULT_ABI,
-        functionName: 'withdraw',
-        args: [amountInWei, address as `0x${string}`, address as `0x${string}`],
+        functionName: 'redeem',
+        args: [sharesToBurn, address as `0x${string}`, address as `0x${string}`],
       });
       
-      console.log('🚀 [BUILD v5.4] sendRawTransaction for withdraw');
+      console.log('🚀 [BUILD v5.5] sendRawTransaction for redeem (shares:', sharesToBurn.toString(), ')');
       const txHash = await sendRawTransaction({
         from: address,
         to: getContractAddress(chainId) as string,
-        data: withdrawCalldata,
+        data: redeemCalldata,
         gas: gasHex,
         chainId,
         provider,
       });
       
-      console.log('🚀 [BUILD v5.4] Withdrawal submitted, hash:', txHash);
+      console.log('🚀 [BUILD v5.5] Redeem submitted, hash:', txHash);
       
       // Show success
       setWithdrawStep('confirming');
       addMessage({
         type: 'success',
-        message: `Withdrawal of ${withdrawAmount} USDC submitted!`,
+        message: `Withdrawal (redeem) of ${withdrawAmount} USDC submitted!`,
         txHash: txHash as `0x${string}`,
         chainId
       });
       pollForBalanceUpdate('withdraw'); // Poll until confirmed
       
     } catch (error: unknown) {
-      console.error('Withdrawal failed:', error);
+      console.error('[BUILD v5.5] Redeem failed:', error);
       setWithdrawStep('error');
       
       // Handle different error types
