@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { formatUnits, parseUnits, encodeFunctionData, toHex } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import { AAVE_VAULT_ABI, ERC20_ABI, getContractAddress, getUSDCAddress } from '@/utils/contracts';
 import { getDepositSignature } from '@/utils/oracleClient';
 import { usePerformanceData } from '@/hooks/usePerformanceData';
@@ -11,55 +11,8 @@ import { useTransactionStatus } from '@/contexts/TransactionStatusContext';
 import { useWelcome } from '@/contexts/WelcomeContext';
 import { useDeposit } from '@/contexts/DepositContext';
 
-// Type for ethereum provider
-type EthereumProvider = {
-  request: (args: { method: string; params: unknown[] }) => Promise<string>;
-};
-
-// Direct wallet transaction sender - uses the connected wallet's provider
-async function sendRawTransaction(params: {
-  from: string;
-  to: string;
-  data: string;
-  gas: string;
-  chainId: number;
-  provider?: EthereumProvider; // Use connected wallet's provider if available
-}): Promise<string> {
-  console.log('🚀 [BUILD v5.6] sendRawTransaction called with:', { ...params, provider: params.provider ? '[provider]' : undefined });
-  
-  // Use provided provider (from connected wallet) or fall back to window.ethereum
-  let ethereum: EthereumProvider | undefined = params.provider;
-  
-  if (!ethereum) {
-    console.log('⚠️ [BUILD v5.6] No provider passed, falling back to window.ethereum');
-    ethereum = (window as unknown as { ethereum?: EthereumProvider }).ethereum;
-  }
-  
-  if (!ethereum) {
-    throw new Error('No ethereum provider found. Please connect your wallet.');
-  }
-  
-  // Convert chainId to hex format
-  const chainIdHex = `0x${params.chainId.toString(16)}`;
-  
-  // Send transaction through the connected wallet with all explicit parameters
-  // Adding value, chainId helps MetaMask's simulation succeed
-  console.log('🚀 [BUILD v5.6] Sending with explicit params - chainId:', chainIdHex, 'gas:', params.gas);
-  const txHash = await ethereum.request({
-    method: 'eth_sendTransaction',
-    params: [{
-      from: params.from,
-      to: params.to,
-      data: params.data,
-      gas: params.gas,           // Already hex formatted
-      value: '0x0',              // Explicit zero value - helps MetaMask simulation
-      chainId: chainIdHex,       // Explicit chainId - ensures correct chain simulation
-    }],
-  });
-  
-  console.log('🚀 [BUILD v5.6] Transaction sent successfully:', txHash);
-  return txHash;
-}
+// BUILD v5.7: Hybrid approach - wagmi writeContract with explicit gas limits
+// This gives us cleaner code while avoiding MetaMask simulation issues
 
 export const BalanceFigma = () => {
   const { address, isConnected, chainId, connector } = useAccount();
@@ -74,21 +27,6 @@ export const BalanceFigma = () => {
   const [depositValidationError, setDepositValidationError] = useState('');
   const [withdrawValidationError, setWithdrawValidationError] = useState('');
 
-  // Get the provider from the connected wallet (fixes issue with multiple wallets)
-  const getWalletProvider = useCallback(async (): Promise<EthereumProvider | undefined> => {
-    if (!connector) {
-      console.log('⚠️ [BUILD v5.6] No connector available');
-      return undefined;
-    }
-    try {
-      const provider = await connector.getProvider();
-      console.log('✅ [BUILD v5.6] Got provider from connector:', connector.name);
-      return provider as EthereumProvider;
-    } catch (error) {
-      console.error('⚠️ [BUILD v5.6] Failed to get provider from connector:', error);
-      return undefined;
-    }
-  }, [connector]);
   
   // Validate and sanitize amount input - only allow valid decimal numbers
   const sanitizeAmountInput = (value: string): string => {
@@ -141,16 +79,34 @@ export const BalanceFigma = () => {
     }
   }, [address, chainId]);
   
-  // Contract write hooks (writeContract functions unused - we use sendRawTransaction instead)
-  const { writeContract: _writeVault, data: vaultTxHash, isPending: isVaultPending, error: vaultWriteError } = useWriteContract();
-  const { writeContract: _writeUSDC, data: usdcTxHash, isPending: isUSDCPending, error: usdcWriteError } = useWriteContract();
-  // Suppress unused variable warnings
-  void _writeVault;
-  void _writeUSDC;
+  // BUILD v5.7: Contract write hooks with explicit gas limits
+  const { 
+    writeContract: writeVault, 
+    data: vaultTxHash, 
+    isPending: isVaultPending, 
+    error: vaultWriteError,
+    reset: resetVaultWrite 
+  } = useWriteContract();
   
-  // Transaction receipt hooks
-  const { isSuccess: isVaultTxSuccess, isError: isVaultTxError } = useWaitForTransactionReceipt({ hash: vaultTxHash, chainId });
-  const { isLoading: isUSDCTxLoading, isSuccess: isUSDCTxSuccess, isError: isUSDCTxError } = useWaitForTransactionReceipt({ hash: usdcTxHash, chainId });
+  const { 
+    writeContract: writeUSDC, 
+    data: usdcTxHash, 
+    isPending: isUSDCPending, 
+    error: usdcWriteError,
+    reset: resetUSDCWrite 
+  } = useWriteContract();
+  
+  // Transaction receipt hooks - automatically track tx status
+  const { 
+    isSuccess: isVaultTxSuccess, 
+    isError: isVaultTxError
+  } = useWaitForTransactionReceipt({ hash: vaultTxHash, chainId });
+  
+  const { 
+    isLoading: isUSDCTxLoading, 
+    isSuccess: isUSDCTxSuccess, 
+    isError: isUSDCTxError 
+  } = useWaitForTransactionReceipt({ hash: usdcTxHash, chainId });
   
   // Read user's USDC balance
   const { refetch: refetchUSDCBalance } = useReadContract({
@@ -396,20 +352,8 @@ export const BalanceFigma = () => {
     }
   };
 
-  // Poll for balance updates after transaction (waits for on-chain confirmation)
-  const pollForBalanceUpdate = useCallback(async (txType: string) => {
-    console.log(`🔄 [BUILD v5.6] Starting balance polling after ${txType}...`);
-    // Poll every 2 seconds for up to 20 seconds (10 attempts)
-    for (let i = 0; i < 10; i++) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      await refreshAllBalances();
-      console.log(`🔄 [BUILD v5.6] Balance refresh attempt ${i + 1}/10 after ${txType}`);
-    }
-    console.log(`✅ [BUILD v5.6] Balance polling complete for ${txType}`);
-  }, [refetchUSDCBalance, refetchVaultShares, refetchTotalAssets, refetchTotalSupply, refetchAllowance, refetchVaultBalance]);
-
-  // Deposit flow functions
-  const handleApproveUSDC = async () => {
+  // BUILD v5.7: Deposit flow using wagmi writeContract with explicit gas limits
+  const handleApproveUSDC = () => {
     if (!address || !chainId || !depositAmount) return;
     
     // Final validation check before proceeding
@@ -419,111 +363,27 @@ export const BalanceFigma = () => {
     }
     
     resetErrors();
+    resetUSDCWrite(); // Reset any previous write state
     setDepositStep('approving');
     
-    try {
-      upsertMessage('deposit-approving', { type: 'pending', message: 'Approving spending limit...' });
-      // Approve maximum amount (type(uint256).max) for unlimited spending
-      const maxAmount = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-      const gasHex = toHex(100000);
-      
-      // Get provider from connected wallet (fixes multi-wallet issue)
-      const provider = await getWalletProvider();
-      
-      console.log('🚀 [BUILD v5.6] sendRawTransaction for approve');
-      const approveCalldata = encodeFunctionData({
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [getContractAddress(chainId) as `0x${string}`, maxAmount],
-      });
-      
-      const txHash = await sendRawTransaction({
-        from: address,
-        to: getUSDCAddress(chainId) as string,
-        data: approveCalldata,
-        gas: gasHex,
-        chainId,
-        provider,
-      });
-      
-      console.log('🚀 [BUILD v5.6] Approval submitted, hash:', txHash);
-      upsertMessage('deposit-approving', { type: 'pending', message: 'Waiting for approval confirmation...', txHash: txHash as `0x${string}`, chainId });
-      
-      // Wait for approval to be confirmed on-chain before proceeding
-      let approvalConfirmed = false;
-      for (let i = 0; i < 15; i++) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const result = await refetchAllowance();
-        const newAllowance = result.data as bigint | undefined;
-        if (newAllowance && newAllowance > BigInt(0)) {
-          approvalConfirmed = true;
-          console.log('✅ [BUILD v5.6] Approval confirmed on-chain, allowance:', newAllowance.toString());
-          break;
-        }
-        console.log(`🔄 [BUILD v5.6] Waiting for approval confirmation... attempt ${i + 1}/15`);
-      }
-      
-      if (!approvalConfirmed) {
-        throw new Error('Approval transaction may have failed or timed out. Please check your wallet and try again.');
-      }
-      
-      upsertMessage('deposit-approving', { type: 'success', message: 'Approval confirmed! Proceeding with deposit...', txHash: txHash as `0x${string}`, chainId });
-      
-      // NOW proceed with deposit after approval is confirmed
-      handleConfirmDeposit();
-      
-    } catch (error: unknown) {
-      console.error('[BUILD v5.6] Approval failed:', error);
-      removeMessage('deposit-approving');
-      
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorMsg = (error as any)?.message || '';
-      
-      // BUILD v5.6: Check if this is MetaMask's false negative on Arbitrum Sepolia
-      if (errorMsg.includes('Internal JSON-RPC error') || errorMsg.includes('-32603')) {
-        console.log('🔍 [BUILD v5.6] MetaMask simulation error on approval - may have succeeded...');
-        
-        // Check allowance to see if approval actually worked
-        const result = await refetchAllowance();
-        const newAllowance = result.data as bigint | undefined;
-        if (newAllowance && newAllowance > BigInt(0)) {
-          console.log('✅ [BUILD v5.6] Approval actually succeeded! Proceeding with deposit...');
-          upsertMessage('deposit-approving', { type: 'success', message: 'Approval confirmed! Proceeding with deposit...' });
-          handleConfirmDeposit();
-          return;
-        }
-        
-        setDepositStep('error');
-        setErrorMessage(
-          'MetaMask reported an error, but this may be a false negative on testnets. ' +
-          'Please check Arbiscan to verify if your approval succeeded, then try again. ' +
-          'If needed, try using Rabby wallet for a better testnet experience.'
-        );
-        return;
-      }
-      
-      setDepositStep('error');
-      
-      // Handle different error types
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((error as any)?.message?.includes('User rejected') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any 
-                    (error as any)?.message?.includes('rejected') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (error as any)?.message?.includes('denied') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (error as any)?.name === 'UserRejectedRequestError') {
-        setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } else if ((error as any)?.message?.includes('insufficient funds')) {
-        setErrorMessage('Insufficient funds for gas fee.');
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setErrorMessage(`Approval failed: ${(error as any)?.message || 'Please check your wallet and try again.'}`);
-      }
-    }
+    upsertMessage('deposit-approving', { type: 'pending', message: 'Approving spending limit...' });
+    
+    // Approve maximum amount (type(uint256).max) for unlimited spending
+    const maxAmount = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+    
+    console.log('🚀 [BUILD v5.7] writeUSDC for approve with explicit gas limit');
+    
+    // Use wagmi writeContract with explicit gas limit to avoid MetaMask simulation issues
+    writeUSDC({
+      address: getUSDCAddress(chainId) as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [getContractAddress(chainId) as `0x${string}`, maxAmount],
+      gas: BigInt(100000), // Explicit gas limit
+    });
   };
 
+  // BUILD v5.7: Deposit using wagmi writeContract with explicit gas limits
   const handleConfirmDeposit = async () => {
     if (!address || !chainId || !depositAmount) return;
     
@@ -534,6 +394,7 @@ export const BalanceFigma = () => {
     }
     
     resetErrors();
+    resetVaultWrite(); // Reset any previous write state
     setDepositStep('depositing');
     
     try {
@@ -544,53 +405,31 @@ export const BalanceFigma = () => {
       upsertMessage('deposit-pending', { type: 'pending', message: 'Getting cross-chain signature...' });
       
       // Get signed balance snapshot from oracle
-      console.log('Requesting signature from oracle...');
+      console.log('🚀 [BUILD v5.7] Requesting signature from oracle...');
       const snapshot = await getDepositSignature(
         amountInWei.toString(),
         address,
         chainId
       );
-      console.log('Signature received from oracle:', snapshot);
+      console.log('🚀 [BUILD v5.7] Signature received from oracle:', snapshot);
       
       // Check if cross-chain assets exist (balance > 0)
-      // The contract requires crossChainInvestedAssets > 0 for depositWithSignature
-      const gasHex = toHex(350000); // Convert gas to hex for raw eth_sendTransaction
-      
-      // Get provider from connected wallet (fixes multi-wallet issue)
-      const provider = await getWalletProvider();
-      
       if (snapshot.balance === '0' || BigInt(snapshot.balance) === BigInt(0)) {
-        console.log('🚀 [BUILD v5.6] No cross-chain assets, using regular deposit via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.6] Gas limit (hex):', gasHex);
+        console.log('🚀 [BUILD v5.7] No cross-chain assets, using regular deposit');
         upsertMessage('deposit-pending', { type: 'pending', message: 'Processing deposit...' });
         
-        // Use raw eth_sendTransaction - bypasses ALL wagmi/viem layers
-        const depositCalldata = encodeFunctionData({
+        // Use wagmi writeContract with explicit gas limit
+        writeVault({
+          address: getContractAddress(chainId) as `0x${string}`,
           abi: AAVE_VAULT_ABI,
           functionName: 'deposit',
           args: [amountInWei, address as `0x${string}`],
+          gas: BigInt(350000), // Explicit gas limit
         });
-        
-        const txHash = await sendRawTransaction({
-          from: address,
-          to: getContractAddress(chainId) as string,
-          data: depositCalldata,
-          gas: gasHex,
-          chainId,
-          provider,
-        });
-        console.log('🚀 [BUILD v5.6] Raw transaction submitted successfully, hash:', txHash);
-        // Raw transaction submitted - show success
-        setDepositStep('confirming');
-        removeMessage('deposit-pending');
-        upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
-        pollForBalanceUpdate('deposit'); // Poll until confirmed
-        return; // Exit early, success handled
         
       } else {
-        console.log('🚀 [BUILD v5.6] Using deposit with signature via raw eth_sendTransaction');
-        console.log('🚀 [BUILD v5.6] Gas limit (hex):', gasHex);
-        console.log('🚀 [BUILD v5.6] Snapshot:', JSON.stringify({
+        console.log('🚀 [BUILD v5.7] Using deposit with signature');
+        console.log('🚀 [BUILD v5.7] Snapshot:', JSON.stringify({
           balance: snapshot.balance,
           nonce: snapshot.nonce,
           deadline: snapshot.deadline,
@@ -599,113 +438,34 @@ export const BalanceFigma = () => {
         }));
         upsertMessage('deposit-pending', { type: 'pending', message: 'Deposit with signature in progress...' });
         
-        try {
-          // Use raw eth_sendTransaction - bypasses ALL wagmi/viem layers
-          const signatureDepositCalldata = encodeFunctionData({
-            abi: AAVE_VAULT_ABI,
-            functionName: 'depositWithExtraInfoViaSignature',
-            args: [
-              amountInWei,
-              address as `0x${string}`,
-              {
-                balance: BigInt(snapshot.balance),
-                nonce: BigInt(snapshot.nonce),
-                deadline: BigInt(snapshot.deadline),
-                assets: BigInt(snapshot.assets),
-                receiver: snapshot.receiver as `0x${string}`,
-              },
-              snapshot.signature as `0x${string}`,
-            ],
-          });
-          
-          const txHash = await sendRawTransaction({
-            from: address,
-            to: getContractAddress(chainId) as string,
-            data: signatureDepositCalldata,
-            gas: gasHex,
-            chainId,
-            provider,
-          });
-          console.log('🚀 [BUILD v5.6] Raw transaction submitted successfully, hash:', txHash);
-          // Raw transaction submitted - show success (user can track in wallet)
-          setDepositStep('confirming');
-          removeMessage('deposit-pending');
-          upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
-          pollForBalanceUpdate('deposit-with-signature'); // Poll until confirmed
-          return; // Exit early, success handled
-        } catch (signatureError) {
-          // If signature deposit fails, try regular deposit as fallback
-          console.warn('🚀 [BUILD v5.6] Signature deposit failed, trying regular deposit:', signatureError);
-          upsertMessage('deposit-pending', { type: 'pending', message: 'Retrying with regular deposit...' });
-          
-          const fallbackCalldata = encodeFunctionData({
-            abi: AAVE_VAULT_ABI,
-            functionName: 'deposit',
-            args: [amountInWei, address as `0x${string}`],
-          });
-          
-          const txHash = await sendRawTransaction({
-            from: address,
-            to: getContractAddress(chainId) as string,
-            data: fallbackCalldata,
-            gas: gasHex,
-            chainId,
-            provider,
-          });
-          console.log('🚀 [BUILD v5.6] Fallback raw transaction submitted successfully, hash:', txHash);
-          // Raw transaction submitted - show success
-          setDepositStep('confirming');
-          removeMessage('deposit-pending');
-          upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC submitted!`, txHash: txHash as `0x${string}`, chainId });
-          pollForBalanceUpdate('deposit-fallback'); // Poll until confirmed
-          return; // Exit early, success handled
-        }
+        // Use wagmi writeContract with signature and explicit gas limit
+        writeVault({
+          address: getContractAddress(chainId) as `0x${string}`,
+          abi: AAVE_VAULT_ABI,
+          functionName: 'depositWithExtraInfoViaSignature',
+          args: [
+            amountInWei,
+            address as `0x${string}`,
+            {
+              balance: BigInt(snapshot.balance),
+              nonce: BigInt(snapshot.nonce),
+              deadline: BigInt(snapshot.deadline),
+              assets: BigInt(snapshot.assets),
+              receiver: snapshot.receiver as `0x${string}`,
+            },
+            snapshot.signature as `0x${string}`,
+          ],
+          gas: BigInt(350000), // Explicit gas limit
+        });
       }
-      
-      // This shouldn't be reached with raw transactions, but keeping for backward compatibility
       
     } catch (error: unknown) {
-      console.error('[BUILD v5.6] Deposit failed:', error);
+      console.error('[BUILD v5.7] Deposit setup failed:', error);
       removeMessage('deposit-pending');
-      
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorMessage = (error as any)?.message || '';
-      
-      // BUILD v5.6: Check if this is MetaMask's false negative on Arbitrum Sepolia
-      // MetaMask's simulation fails but the transaction may have actually succeeded
-      if (errorMessage.includes('Internal JSON-RPC error') || errorMessage.includes('-32603')) {
-        console.log('🔍 [BUILD v5.6] MetaMask simulation error detected - checking if tx may have succeeded...');
-        
-        // Show a more helpful message for this known issue
-        setDepositStep('error');
-        setErrorMessage(
-          'MetaMask reported an error, but this may be a false negative on testnets. ' +
-          'Please check Arbiscan to verify if your transaction actually succeeded. ' +
-          'If needed, try using Rabby wallet for a better testnet experience.'
-        );
-        
-        // Still poll for balance changes in case it worked
-        pollForBalanceUpdate('deposit-maybe-success');
-        return;
-      }
-      
       setDepositStep('error');
       
-      // Handle different error types
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((error as any)?.message?.includes('User rejected') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any 
-                    (error as any)?.message?.includes('rejected') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (error as any)?.message?.includes('denied') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (error as any)?.name === 'UserRejectedRequestError') {
-        setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } else if ((error as any)?.message?.includes('insufficient funds')) {
-        setErrorMessage('Insufficient USDC balance or gas fee.');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } else if ((error as any)?.message?.includes('Oracle')) {
+      if ((error as any)?.message?.includes('Oracle')) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setErrorMessage(`Oracle service error: ${(error as any)?.message || 'Unable to get signature.'}`);
       } else {
@@ -715,25 +475,43 @@ export const BalanceFigma = () => {
     }
   };
 
-  // Watch for transaction completion and errors
+  // BUILD v5.7: Watch for transaction completion and errors with improved error handling
   useEffect(() => {
+    // Helper to check for MetaMask simulation errors (false negatives on testnets)
+    const isMetaMaskSimulationError = (error: Error | null) => {
+      if (!error) return false;
+      const msg = error.message || '';
+      return msg.includes('Internal JSON-RPC error') || msg.includes('-32603');
+    };
+
+    // Helper to check for user rejection
+    const isUserRejection = (error: Error | null) => {
+      if (!error) return false;
+      const msg = error.message?.toLowerCase() || '';
+      return msg.includes('user rejected') || 
+             msg.includes('rejected') || 
+             msg.includes('denied') ||
+             msg.includes('userrequestrejected');
+    };
+
+    // Success handlers
     if (isUSDCTxSuccess && depositStep === 'approving') {
-      // Approval completed, now proceed with deposit
+      console.log('✅ [BUILD v5.7] Approval confirmed on-chain');
       upsertMessage('deposit-approving', { type: 'success', message: 'Approval successful. Proceeding…', txHash: usdcTxHash, chainId });
       handleConfirmDeposit();
-      // Also refetch allowance for future deposits
       refetchAllowance();
     }
-    // Handle deposit success from writeVault (for approve flow)
+    
     if (isVaultTxSuccess && (depositStep === 'depositing' || depositStep === 'error')) {
+      console.log('✅ [BUILD v5.7] Deposit confirmed on-chain');
       setDepositStep('confirming');
       removeMessage('deposit-pending');
       upsertMessage('deposit-success', { type: 'success', message: `Deposit of ${depositAmount} USDC completed successfully!`, txHash: vaultTxHash, chainId });
-      // Refresh all balances immediately after successful deposit
       refreshAllBalances();
-      // Stay on confirmation screen until user clicks "Done"
     }
+    
     if (isVaultTxSuccess && (withdrawStep === 'withdrawing' || withdrawStep === 'error')) {
+      console.log('✅ [BUILD v5.7] Withdrawal confirmed on-chain');
       setWithdrawStep('confirming');
       addMessage({
         type: 'success',
@@ -741,65 +519,104 @@ export const BalanceFigma = () => {
         txHash: vaultTxHash,
         chainId
       });
-      // Refresh all balances immediately after successful withdrawal
       refreshAllBalances();
-      // Stay on confirmation screen until user clicks "Done"
     }
     
-    // Handle transaction errors
+    // Transaction receipt errors (tx submitted but reverted)
     if (isUSDCTxError && depositStep === 'approving') {
+      console.log('❌ [BUILD v5.7] Approval tx reverted on-chain');
       setDepositStep('error');
-      const errorMsg = 'USDC approval transaction failed. Please try again.';
-      setErrorMessage(errorMsg);
-      upsertMessage('deposit-approving', { type: 'error', message: errorMsg, txHash: usdcTxHash, chainId });
+      setErrorMessage('USDC approval transaction reverted. Please try again.');
+      upsertMessage('deposit-approving', { type: 'error', message: 'Approval failed on-chain.', txHash: usdcTxHash, chainId });
     }
+    
     if (isVaultTxError && depositStep === 'depositing') {
+      console.log('❌ [BUILD v5.7] Deposit tx reverted on-chain');
       setDepositStep('error');
-      setErrorMessage('Deposit transaction failed. If it succeeded in your wallet, this will update shortly.');
-      upsertMessage('deposit-pending', { type: 'error', message: 'Deposit failed. Please try again.', txHash: vaultTxHash, chainId });
+      setErrorMessage('Deposit transaction reverted on-chain. Please try again.');
+      upsertMessage('deposit-pending', { type: 'error', message: 'Deposit failed.', txHash: vaultTxHash, chainId });
     }
+    
     if (isVaultTxError && withdrawStep === 'withdrawing') {
+      console.log('❌ [BUILD v5.7] Withdrawal tx reverted on-chain');
       setWithdrawStep('error');
-      setErrorMessage('Withdrawal transaction failed. If it succeeded in your wallet, this will update shortly.');
+      setErrorMessage('Withdrawal transaction reverted on-chain. Please try again.');
     }
 
-    // Handle writeContract errors (including MetaMask rejections)
+    // WriteContract errors (tx submission failed)
     if (usdcWriteError && depositStep === 'approving') {
-      setDepositStep('error');
-      if (usdcWriteError.message?.includes('User rejected') || 
-          usdcWriteError.message?.includes('rejected') || 
-          usdcWriteError.message?.includes('denied') ||
-          usdcWriteError.message?.includes('UserRejectedRequestError')) {
+      console.log('⚠️ [BUILD v5.7] USDC write error:', usdcWriteError.message);
+      
+      if (isUserRejection(usdcWriteError)) {
+        setDepositStep('error');
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
+      } else if (isMetaMaskSimulationError(usdcWriteError)) {
+        // MetaMask simulation error - might be a false negative
+        console.log('🔍 [BUILD v5.7] MetaMask simulation error detected - checking allowance...');
+        // Check if approval actually worked
+        refetchAllowance().then((result) => {
+          const newAllowance = result.data as bigint | undefined;
+          if (newAllowance && newAllowance > BigInt(0)) {
+            console.log('✅ [BUILD v5.7] Approval succeeded despite MetaMask error!');
+            upsertMessage('deposit-approving', { type: 'success', message: 'Approval confirmed! Proceeding...' });
+            handleConfirmDeposit();
+          } else {
+            setDepositStep('error');
+            setErrorMessage(
+              'MetaMask reported an error, but this may be a false negative on testnets. ' +
+              'Please check Arbiscan to verify, then try again. Consider using Rabby wallet.'
+            );
+          }
+        });
+        return;
       } else {
+        setDepositStep('error');
         setErrorMessage(`Approval failed: ${usdcWriteError.message || 'Please try again.'}`);
       }
     }
     
     if (vaultWriteError && depositStep === 'depositing') {
-      setDepositStep('error');
-      if (vaultWriteError.message?.includes('User rejected') || 
-          vaultWriteError.message?.includes('rejected') || 
-          vaultWriteError.message?.includes('denied') ||
-          vaultWriteError.message?.includes('UserRejectedRequestError')) {
+      console.log('⚠️ [BUILD v5.7] Vault write error (deposit):', vaultWriteError.message);
+      removeMessage('deposit-pending');
+      
+      if (isUserRejection(vaultWriteError)) {
+        setDepositStep('error');
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
+      } else if (isMetaMaskSimulationError(vaultWriteError)) {
+        setDepositStep('error');
+        setErrorMessage(
+          'MetaMask reported an error, but this may be a false negative on testnets. ' +
+          'Please check Arbiscan to verify your transaction. Consider using Rabby wallet.'
+        );
+        // Still refresh balances in case it worked
+        refreshAllBalances();
       } else {
+        setDepositStep('error');
         setErrorMessage(`Deposit failed: ${vaultWriteError.message || 'Please try again.'}`);
       }
     }
     
     if (vaultWriteError && withdrawStep === 'withdrawing') {
-      setWithdrawStep('error');
-      if (vaultWriteError.message?.includes('User rejected') || 
-          vaultWriteError.message?.includes('rejected') || 
-          vaultWriteError.message?.includes('denied') ||
-          vaultWriteError.message?.includes('UserRejectedRequestError')) {
+      console.log('⚠️ [BUILD v5.7] Vault write error (withdraw):', vaultWriteError.message);
+      
+      if (isUserRejection(vaultWriteError)) {
+        setWithdrawStep('error');
         setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
+      } else if (isMetaMaskSimulationError(vaultWriteError)) {
+        setWithdrawStep('error');
+        setErrorMessage(
+          'MetaMask reported an error, but this may be a false negative on testnets. ' +
+          'Please check Arbiscan to verify your transaction. Consider using Rabby wallet.'
+        );
+        // Still refresh balances in case it worked
+        refreshAllBalances();
       } else {
+        setWithdrawStep('error');
         setErrorMessage(`Withdrawal failed: ${vaultWriteError.message || 'Please try again.'}`);
       }
     }
-  }, [isUSDCTxSuccess, isVaultTxSuccess, isUSDCTxError, isVaultTxError, usdcWriteError, vaultWriteError, depositStep, withdrawStep]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUSDCTxSuccess, isVaultTxSuccess, isUSDCTxError, isVaultTxError, usdcWriteError, vaultWriteError, depositStep, withdrawStep, usdcTxHash, vaultTxHash, chainId, depositAmount, withdrawAmount]);
 
   // If user cancels in wallet or transaction fails, show appropriate error
   useEffect(() => {
@@ -1230,7 +1047,8 @@ export const BalanceFigma = () => {
   const hasEnoughWithdrawBalance = withdrawableAmount > 0 && isValidAmount(withdrawAmount) && parseFloat(withdrawAmount) <= withdrawableAmount;
   const canWithdraw = isWithdrawAmountValid && hasEnoughWithdrawBalance && !isVaultPending && !withdrawValidationError;
 
-  const handleWithdraw = async () => {
+  // BUILD v5.7: Withdraw using wagmi writeContract with explicit gas limits
+  const handleWithdraw = () => {
     if (!withdrawAmount || !chainId || !address || !canWithdraw) return;
     
     // Final validation check before proceeding
@@ -1239,106 +1057,20 @@ export const BalanceFigma = () => {
       return;
     }
     
-    try {
-      setWithdrawStep('withdrawing');
-      console.log('💳 [BUILD v5.6] Starting withdrawal:', withdrawAmount, 'USDC');
-      
-      // BUILD v5.5: Use redeem() instead of withdraw() - simpler state calculation may help MetaMask simulation
-      // Calculate shares to burn: shares = assets * totalSupply / totalAssets
-      const assetsWei = parseUnits(withdrawAmount, 6);
-      
-      // Calculate shares needed (round up to ensure we get at least the requested assets)
-      let sharesToBurn: bigint;
-      if (totalAssets && totalSupply && totalAssets > BigInt(0)) {
-        // shares = ceil(assets * totalSupply / totalAssets)
-        sharesToBurn = (assetsWei * totalSupply + totalAssets - BigInt(1)) / totalAssets;
-        console.log('🧮 [BUILD v5.6] Calculated shares to burn:', sharesToBurn.toString(), 'for', withdrawAmount, 'USDC');
-      } else {
-        // Fallback: assume 1:1 ratio if we don't have the data
-        sharesToBurn = assetsWei;
-        console.log('⚠️ [BUILD v5.6] Using 1:1 share ratio fallback');
-      }
-      
-      // Ensure we don't try to burn more shares than we have
-      if (vaultShares && sharesToBurn > vaultShares) {
-        console.log('⚠️ [BUILD v5.6] Capping shares to user balance:', vaultShares.toString());
-        sharesToBurn = vaultShares;
-      }
-      
-      // Increased gas limit for redeem (500k) - helps MetaMask simulation succeed
-      const gasHex = toHex(500000);
-      
-      // Get provider from connected wallet (fixes multi-wallet issue)
-      const provider = await getWalletProvider();
-      
-      // Use redeem() instead of withdraw() - specifies shares to burn rather than assets to receive
-      const redeemCalldata = encodeFunctionData({
-        abi: AAVE_VAULT_ABI,
-        functionName: 'redeem',
-        args: [sharesToBurn, address as `0x${string}`, address as `0x${string}`],
-      });
-      
-      console.log('🚀 [BUILD v5.6] sendRawTransaction for redeem (shares:', sharesToBurn.toString(), ')');
-      const txHash = await sendRawTransaction({
-        from: address,
-        to: getContractAddress(chainId) as string,
-        data: redeemCalldata,
-        gas: gasHex,
-        chainId,
-        provider,
-      });
-      
-      console.log('🚀 [BUILD v5.6] Redeem submitted, hash:', txHash);
-      
-      // Show success
-      setWithdrawStep('confirming');
-      addMessage({
-        type: 'success',
-        message: `Withdrawal (redeem) of ${withdrawAmount} USDC submitted!`,
-        txHash: txHash as `0x${string}`,
-        chainId
-      });
-      pollForBalanceUpdate('withdraw'); // Poll until confirmed
-      
-    } catch (error: unknown) {
-      console.error('[BUILD v5.6] Redeem failed:', error);
-      
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorMsg = (error as any)?.message || '';
-      
-      // BUILD v5.6: Check if this is MetaMask's false negative on Arbitrum Sepolia
-      if (errorMsg.includes('Internal JSON-RPC error') || errorMsg.includes('-32603')) {
-        console.log('🔍 [BUILD v5.6] MetaMask simulation error detected - tx may have succeeded...');
-        
-        setWithdrawStep('error');
-        setErrorMessage(
-          'MetaMask reported an error, but this may be a false negative on testnets. ' +
-          'Please check Arbiscan to verify if your transaction actually succeeded. ' +
-          'If needed, try using Rabby wallet for a better testnet experience.'
-        );
-        
-        // Still poll for balance changes in case it worked
-        pollForBalanceUpdate('withdraw-maybe-success');
-        return;
-      }
-      
-      setWithdrawStep('error');
-      
-      // Handle different error types
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((error as any)?.message?.includes('User rejected') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any 
-                    (error as any)?.message?.includes('rejected') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (error as any)?.message?.includes('denied') ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (error as any)?.name === 'UserRejectedRequestError') {
-        setErrorMessage('Transaction was rejected. Please try again if you want to proceed.');
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setErrorMessage(`Withdrawal failed: ${(error as any)?.message || 'Please try again.'}`);
-      }
-    }
+    setWithdrawStep('withdrawing');
+    resetVaultWrite(); // Reset any previous write state
+    console.log('💳 [BUILD v5.7] Starting withdrawal:', withdrawAmount, 'USDC');
+    
+    const assetsWei = parseUnits(withdrawAmount, 6);
+    
+    // Use wagmi writeContract with explicit gas limit
+    writeVault({
+      address: getContractAddress(chainId) as `0x${string}`,
+      abi: AAVE_VAULT_ABI,
+      functionName: 'withdraw',
+      args: [assetsWei, address as `0x${string}`, address as `0x${string}`],
+      gas: BigInt(350000), // Explicit gas limit
+    });
   };
 
   const renderWithdrawState = () => {
